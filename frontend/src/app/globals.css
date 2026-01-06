@@ -1,0 +1,97 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+:root {
+  /* Light Theme Brand Palette */
+  --brand-dark: #ffffff;          /* Main background - pure white */
+  --brand-surface: #f8f9fa;       /* Card/surface backgrounds - very light gray */
+  --brand-border: #e5e7eb;        /* Border color - light gray */
+
+  --brand-primary: #60259f;       /* Your Company Blue */
+  --brand-secondary: #beff50;     /* Indigo */
+  --brand-accent: #60259f;        /* Purple */
+
+  /* Text colors for light theme */
+  --text-primary: #111827;        /* Almost black for main text */
+  --text-secondary: #6b7280;      /* Gray for secondary text */
+  --text-muted: #9ca3af;          /* Light gray for muted text */
+
+  --foreground: var(--text-primary);
+  --background: var(--brand-dark);
+}
+
+@theme inline {
+  /* Background Colors */
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-border: var(--brand-border);
+
+  /* Brand Colors */
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-secondary: var(--brand-secondary);
+  --color-brand-accent: var(--brand-accent);
+
+  /* Text Colors */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  /* Fonts */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular;
+
+  /* Custom Animations for "Magic" feel */
+  --animate-shimmer-glow: shimmer-glow 2s ease-in-out infinite;
+  --animate-thinking-bounce: thinking-bounce 1.4s infinite ease-in-out;
+  --animate-fade-in-up: fade-in-up 0.5s ease-out forwards;
+
+  @keyframes shimmer-glow {
+    0%, 100% { opacity: 0.5; transform: scale(1); filter: blur(0px); }
+    50% { opacity: 1; transform: scale(1.02); filter: blur(1px); }
+  }
+
+  @keyframes thinking-bounce {
+    0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Base Styles */
+body {
+  background: var(--brand-dark);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbar for the Magic UI */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--brand-border);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-primary);
+}
+
+/* Utility to hide scrollbar but keep functionality */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

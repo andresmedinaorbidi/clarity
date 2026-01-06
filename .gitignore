@@ -1,0 +1,55 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# =====================
+# Frontend (Next.js)
+# =====================
+
+# dependencies
+frontend/node_modules/
+frontend/.pnp
+frontend/.pnp.*
+frontend/.yarn/*
+!frontend/.yarn/patches
+!frontend/.yarn/plugins
+!frontend/.yarn/releases
+!frontend/.yarn/versions
+
+# testing
+frontend/coverage/
+
+# next.js
+frontend/.next/
+frontend/out/
+
+# production
+frontend/build/
+
+# debug
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.pnpm-debug.log*
+
+# typescript
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# --- Claude Code ---
+claude-code/
+.claude/
+claude/
+
+# --- Python ---
+backend/.venv/
+backend/__pycache__/
+backend/.env
+
+# Windows reserved device name accidentally created
+nul
+nul/
