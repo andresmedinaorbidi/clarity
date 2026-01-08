@@ -49,23 +49,50 @@ export default function ChatInterface({ messages, onSend, loading, isThinking }:
         {messages.map((msg, i) => {
           const isLastMessage = i === messages.length - 1;
           const isAssistant = msg.role === "assistant";
-          
-          // ONLY use the effect if it's the latest message AND it's from the AI.
-          // This prevents history from re-typing and user messages from lagging.
-          const shouldAnimate = isLastMessage && isAssistant;
+
+          // Check for specific artifact generation placeholders
+          const isGeneratingSitemap = msg.content === "[GENERATING_SITEMAP]";
+          const isGeneratingPRD = msg.content === "[GENERATING_PRD]";
+          const isGeneratingArtifact = msg.content === "[GENERATING_ARTIFACT]";
+          const isEmptyAndLoading = msg.content === "" && loading && isLastMessage;
+
+          // Determine if we should show the Magic Pulse Bubble
+          const showMagicPulse = isGeneratingSitemap || isGeneratingPRD || isGeneratingArtifact || isEmptyAndLoading;
+
+          // ONLY use smooth text effect if it's the latest message AND it's from the AI AND it's not a placeholder.
+          const shouldAnimate = isLastMessage && isAssistant && !showMagicPulse;
+
+          // Determine the contextual message for Magic Pulse
+          let pulseMessage = "Thinking...";
+          if (isGeneratingSitemap) pulseMessage = "Architecting Sitemap...";
+          else if (isGeneratingPRD) pulseMessage = "Drafting Technical Spec...";
+          else if (isGeneratingArtifact) pulseMessage = "Architecting...";
 
           return (
             <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
-                msg.role === "user" 
-                  ? "bg-brand-primary text-white shadow-lg shadow-brand-primary/20" 
-                  : "bg-brand-surface border border-brand-border text-text-primary shadow-sm"
-              }`}>
-                <SmoothText 
-                  text={msg.content} 
-                  disabled={!shouldAnimate} 
-                />
-              </div>
+              {msg.role === "user" ? (
+                <div className="max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed bg-brand-primary text-white shadow-lg shadow-brand-primary/20">
+                  {msg.content}
+                </div>
+              ) : showMagicPulse ? (
+                /* Magic Pulse Bubble for Artifact Generation */
+                <div className="max-w-[85%] bg-gradient-to-r from-brand-primary/10 via-brand-secondary/10 to-brand-primary/10 border border-brand-primary/20 rounded-2xl p-5 shadow-lg animate-shimmer-glow">
+                  <div className="flex items-center gap-3">
+                    <Sparkles className="text-brand-primary animate-pulse" size={18} />
+                    <span className="text-sm font-medium text-brand-primary">
+                      {pulseMessage}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                /* Normal Assistant Message */
+                <div className="max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed bg-brand-surface border border-brand-border text-text-primary shadow-sm">
+                  <SmoothText
+                    text={msg.content}
+                    disabled={!shouldAnimate}
+                  />
+                </div>
+              )}
             </div>
           );
         })}

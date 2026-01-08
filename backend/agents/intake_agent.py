@@ -6,7 +6,11 @@ def run_intake_agent(state: WebsiteState) -> WebsiteState:
     # 1. Prepare Data for Gemini
     state_dict = state.model_dump()
     state_dict['format_instructions'] = "Return ONLY a plain JSON list of strings. Do not return a dictionary. Example: ['Industry', 'Brand Motto']"
-    
+
+    # Pass assumptions to the prompt so Auditor knows what was inferred
+    assumptions_list = state.project_meta.get("assumptions", [])
+    state_dict['assumptions'] = ", ".join(assumptions_list) if assumptions_list else "None"
+
     # 2. Get the prompt (Make sure your prompts/intake_agent.txt is updated to use these variables)
     filled_prompt = get_filled_prompt("intake_agent", state_dict)
     

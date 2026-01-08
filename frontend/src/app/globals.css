@@ -44,6 +44,7 @@
   --animate-shimmer-glow: shimmer-glow 2s ease-in-out infinite;
   --animate-thinking-bounce: thinking-bounce 1.4s infinite ease-in-out;
   --animate-fade-in-up: fade-in-up 0.5s ease-out forwards;
+  --animate-scanline: scanline 8s linear infinite;
 
   @keyframes shimmer-glow {
     0%, 100% { opacity: 0.5; transform: scale(1); filter: blur(0px); }
@@ -58,6 +59,11 @@
   @keyframes fade-in-up {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes scanline {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100%; }
   }
 }
 

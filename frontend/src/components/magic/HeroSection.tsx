@@ -37,12 +37,12 @@ export default function HeroSection({ onStart, loading }: HeroSectionProps) {
             className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-surface border border-brand-border text-brand-primary text-xs font-medium mb-4"
           >
             <Sparkles size={14} />
-            Teo tu asistente virtual 
+            Teo your virtual asistant
           </motion.div>
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-text-primary">
-            ¿Qué quieres <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-primary to-brand-secondary">
-              construir hoy?
+            Clarity
+            <span className="text-brand-secondary">
+              .
             </span>
           </h1>
           <p className="text-text-secondary text-lg max-w-xl mx-auto">
