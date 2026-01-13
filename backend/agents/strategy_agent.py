@@ -1,5 +1,5 @@
 import json
-from utils import get_filled_prompt, stream_gemini, log_agent_action
+from utils import get_filled_prompt, stream_gemini, log_agent_action, emit_progress_event
 from state_schema import WebsiteState, AgentReasoning
 
 def run_strategy_agent(state: WebsiteState, feedback: str = None):
@@ -8,6 +8,9 @@ def run_strategy_agent(state: WebsiteState, feedback: str = None):
     Populates state.project_meta with business objectives, target audience, and success metrics.
     Yields status updates during processing.
     """
+    # Emit progress start
+    emit_progress_event(state, "strategy", "Analyzing business objectives...")
+
     # 1. Determine the instruction
     if feedback:
         instruction = f"REVISE the business strategy based on this user feedback: '{feedback}'."
@@ -68,6 +71,15 @@ def run_strategy_agent(state: WebsiteState, feedback: str = None):
             state.agent_reasoning.append(strategy_reasoning)
 
             state.logs.append(f"Strategy Agent: Business goals defined - {len(data.get('business_goals', []))} objectives identified.")
+
+            # Emit completion event
+            emit_progress_event(
+                state,
+                "strategy",
+                f"Strategy defined: {len(data.get('business_goals', []))} goals identified",
+                artifact_refs=["project_meta"]
+            )
+
             print(f"[STRATEGY] Goals: {state.project_meta['business_goals']}")
         else:
             raise ValueError("Invalid JSON structure returned")

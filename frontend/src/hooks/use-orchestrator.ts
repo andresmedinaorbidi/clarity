@@ -18,6 +18,18 @@ export interface SitemapPage {
   sections: string[];
 }
 
+export interface ProgressEvent {
+  timestamp: string;
+  phase: string;
+  message: string;
+  artifact_refs?: string[];
+}
+
+export interface Assumptions {
+  suggested: Record<string, any>;
+  approved: Record<string, any>;
+}
+
 export interface WebsiteState {
   project_name: string;
   industry: string;
@@ -36,6 +48,12 @@ export interface WebsiteState {
   ux_strategy?: Record<string, any> | null;
   copywriting?: Record<string, any> | null;
   context_summary: string;
+
+  // Magical Flow additions
+  progress_events: ProgressEvent[];
+  assumptions: Assumptions;
+  direction_snapshot: string;
+  reveal_feedback: string[];
 }
 
 export function useOrchestrator() {
@@ -48,6 +66,10 @@ export function useOrchestrator() {
     logs: [],
     current_step: "idle",
     sitemap: [],
+    progress_events: [],
+    assumptions: { suggested: {}, approved: {} },
+    direction_snapshot: "",
+    reveal_feedback: [],
     prd_document: "",
     generated_code: "",
     chat_history: [],

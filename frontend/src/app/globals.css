@@ -65,14 +65,29 @@
     0% { background-position: 0 0; }
     100% { background-position: 0 100%; }
   }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
 }
 
 /* Base Styles */
-body {
+html, body {
   background: var(--brand-dark);
   color: var(--text-primary);
-  font-family: var(--font-sans);
+  font-family: var(--font-geist-sans), 'Geist', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden; /* Fix: Prevent app-level scrollbar */
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* Ensure all elements inherit Geist font */
+* {
+  font-family: inherit !important;
 }
 
 /* Custom Scrollbar for the Magic UI */

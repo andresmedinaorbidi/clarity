@@ -3,9 +3,14 @@ from utils import get_filled_prompt, ask_gemini, log_agent_action
 from state_schema import WebsiteState
 
 def run_intake_agent(state: WebsiteState) -> WebsiteState:
+    # MAGICAL FLOW: Only check for CRITICAL fields
+    # Critical fields: audience, offer, location/service area, primary conversion goal
     # 1. Prepare Data for Gemini
     state_dict = state.model_dump()
-    state_dict['format_instructions'] = "Return ONLY a plain JSON list of strings. Do not return a dictionary. Example: ['Industry', 'Brand Motto']"
+    state_dict['format_instructions'] = """Return ONLY a plain JSON list of CRITICAL missing fields.
+Critical fields are: target audience, core offer/service, location/service area, primary conversion goal.
+Do NOT flag nice-to-have fields like industry, brand colors, or style preferences.
+Example: ['Target Audience', 'Primary Conversion Goal']"""
 
     # Pass assumptions to the prompt so Auditor knows what was inferred
     assumptions_list = state.project_meta.get("assumptions", [])
@@ -40,9 +45,9 @@ def run_intake_agent(state: WebsiteState) -> WebsiteState:
         
     # 4. Logging (Internal thoughts)
     if not state.missing_info:
-        state.logs.append("Intake Agent Audit: All essential information is present.")
+        state.logs.append("Intake Agent Audit: All critical information is present. Auto-proceeding.")
     else:
-        state.logs.append(f"Intake Agent Audit: Still waiting for: {state.missing_info}")
+        state.logs.append(f"Intake Agent Audit: Critical fields missing: {state.missing_info}")
 
     # 5. Output to Terminal
     log_agent_action("Intake Agent", filled_prompt, ai_response)

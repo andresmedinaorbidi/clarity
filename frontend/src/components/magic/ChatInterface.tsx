@@ -14,11 +14,31 @@ interface ChatInterfaceProps {
   onSend: (input: string) => void;
   loading: boolean;
   isThinking?: boolean;
+  state?: any; // Optional state for contextual hints
 }
 
-export default function ChatInterface({ messages, onSend, loading, isThinking }: ChatInterfaceProps) {
+const THINKING_PHRASES = [
+  "Analyzing your request...",
+  "Consulting agents...",
+  "Synthesizing insights...",
+  "Crafting response...",
+];
+
+export default function ChatInterface({ messages, onSend, loading, isThinking, state }: ChatInterfaceProps) {
   const [input, setInput] = React.useState("");
+  const [thinkingPhraseIndex, setThinkingPhraseIndex] = React.useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Cycle through thinking phrases
+  useEffect(() => {
+    if (isThinking || loading) {
+      const interval = setInterval(() => {
+        setThinkingPhraseIndex((prev) => (prev + 1) % THINKING_PHRASES.length);
+      }, 2000);
+      return () => clearInterval(interval);
+    }
+  }, [isThinking, loading]);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -29,6 +49,8 @@ export default function ChatInterface({ messages, onSend, loading, isThinking }:
     if (input.trim() && !loading) {
       onSend(input);
       setInput("");
+      // Keep focus in input after sending
+      setTimeout(() => inputRef.current?.focus(), 50);
     }
   };
 
@@ -46,6 +68,30 @@ export default function ChatInterface({ messages, onSend, loading, isThinking }:
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+        {/* Contextual Hint for Direction Lock (GATE A) */}
+        {state?.current_step === "direction_lock" && state?.direction_snapshot && (
+          <div className="p-4 bg-brand-primary/5 border border-brand-primary/20 rounded-xl">
+            <p className="text-xs text-brand-primary font-bold mb-2 uppercase tracking-wider">
+              🎯 Direction Snapshot
+            </p>
+            <div className="text-sm text-text-primary whitespace-pre-line">
+              {state.direction_snapshot}
+            </div>
+          </div>
+        )}
+
+        {/* Contextual Hint for Structure Confirm (GATE B) */}
+        {state?.current_step === "structure_confirm" && state?.sitemap && state.sitemap.length > 0 && (
+          <div className="p-4 bg-brand-primary/5 border border-brand-primary/20 rounded-xl">
+            <p className="text-xs text-brand-primary font-bold mb-2 uppercase tracking-wider">
+              🏗️ Structure Ready
+            </p>
+            <p className="text-sm text-text-primary">
+              {state.sitemap.length} pages designed. Review structure on the left.
+            </p>
+          </div>
+        )}
+
         {messages.map((msg, i) => {
           const isLastMessage = i === messages.length - 1;
           const isAssistant = msg.role === "assistant";
@@ -75,9 +121,16 @@ export default function ChatInterface({ messages, onSend, loading, isThinking }:
                   {msg.content}
                 </div>
               ) : showMagicPulse ? (
-                /* Magic Pulse Bubble for Artifact Generation */
-                <div className="max-w-[85%] bg-gradient-to-r from-brand-primary/10 via-brand-secondary/10 to-brand-primary/10 border border-brand-primary/20 rounded-2xl p-5 shadow-lg animate-shimmer-glow">
-                  <div className="flex items-center gap-3">
+                /* Magic Pulse Bubble for Artifact Generation with Shimmer */
+                <div
+                  className="max-w-[85%] border border-brand-primary/20 rounded-2xl p-5 shadow-lg relative overflow-hidden"
+                  style={{
+                    background: 'linear-gradient(90deg, rgba(96, 37, 159, 0.05), rgba(96, 37, 159, 0.15), rgba(96, 37, 159, 0.05))',
+                    backgroundSize: '200% 100%',
+                    animation: 'shimmer 2s infinite'
+                  }}
+                >
+                  <div className="flex items-center gap-3 relative z-10">
                     <Sparkles className="text-brand-primary animate-pulse" size={18} />
                     <span className="text-sm font-medium text-brand-primary">
                       {pulseMessage}
@@ -97,13 +150,27 @@ export default function ChatInterface({ messages, onSend, loading, isThinking }:
           );
         })}
 
-        {/* Thinking Animation (Shown when the user has sent a msg but stream hasn't started) */}
+        {/* Claude-Style Thinking Animation with Cycling Phrases */}
         {isThinking && (
           <div className="flex justify-start">
-            <div className="bg-brand-surface border border-brand-border p-5 rounded-2xl flex gap-1.5 items-center">
-              <span className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
-              <span className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
-              <span className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce" />
+            <div
+              className="border border-brand-primary/20 p-5 rounded-2xl relative overflow-hidden"
+              style={{
+                background: 'linear-gradient(90deg, rgba(96, 37, 159, 0.05), rgba(96, 37, 159, 0.15), rgba(96, 37, 159, 0.05))',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 2s infinite'
+              }}
+            >
+              <div className="flex items-center gap-3 relative z-10">
+                <div className="flex gap-1.5 items-center">
+                  <span className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce" />
+                </div>
+                <span className="text-sm font-medium text-brand-primary">
+                  {THINKING_PHRASES[thinkingPhraseIndex]}
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -114,10 +181,12 @@ export default function ChatInterface({ messages, onSend, loading, isThinking }:
       <form onSubmit={handleSubmit} className="p-6 bg-brand-surface border-t border-brand-border">
         <div className="relative group">
           <input
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={loading}
             placeholder={loading ? "AI is typing..." : "Talk to the agents..."}
+            autoFocus
             className="w-full bg-white border border-brand-border rounded-xl py-4 pl-4 pr-12 text-sm text-text-primary outline-none focus:border-brand-primary/50 focus:ring-1 focus:ring-brand-primary/20 transition-all placeholder:text-text-muted"
           />
           <button

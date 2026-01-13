@@ -1,7 +1,8 @@
 import os
 from google import genai
 from dotenv import load_dotenv
-from typing import Any
+from typing import Any, List, Optional
+from datetime import datetime
 
 load_dotenv()
 
@@ -138,3 +139,22 @@ OUTPUT ONLY THE SUMMARY PARAGRAPH. NO PREAMBLE."""
         return summary.strip()
     except Exception as e:
         return f"[Summary generation failed: {str(e)}]"
+
+def emit_progress_event(state, phase: str, message: str, artifact_refs: Optional[List[str]] = None):
+    """
+    Emits a progress event to the state timeline.
+
+    Args:
+        state: WebsiteState object
+        phase: Current phase/state name (e.g., "strategy", "direction_lock")
+        message: Human-readable progress message
+        artifact_refs: List of artifact keys referenced (e.g., ["sitemap", "prd_document"])
+    """
+    event = {
+        "timestamp": datetime.now().isoformat(),
+        "phase": phase,
+        "message": message,
+        "artifact_refs": artifact_refs or []
+    }
+    state.progress_events.append(event)
+    print(f"[PROGRESS EVENT] {phase}: {message}")

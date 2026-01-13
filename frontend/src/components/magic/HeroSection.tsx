@@ -11,13 +11,63 @@ interface HeroSectionProps {
 
 export default function HeroSection({ onStart, loading }: HeroSectionProps) {
   const [input, setInput] = useState("");
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [userMessage, setUserMessage] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (input.trim() && !loading) {
-      onStart(input);
+      setUserMessage(input);
+      setIsTransitioning(true);
+      // Delay actual send to show transition
+      setTimeout(() => {
+        onStart(input);
+      }, 100);
     }
   };
+
+  // If transitioning, show thinking screen
+  if (isTransitioning) {
+    return (
+      <div className="relative flex flex-col items-center justify-center min-h-screen px-4 overflow-hidden bg-brand-dark">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-brand-primary/5 rounded-full blur-[120px] pointer-events-none" />
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-3xl text-center space-y-8"
+        >
+          {/* Echo user message */}
+          <div className="p-8 bg-white/60 backdrop-blur-xl rounded-3xl border border-brand-border shadow-2xl">
+            <p className="text-2xl text-text-primary font-medium leading-relaxed">
+              "{userMessage}"
+            </p>
+          </div>
+
+          {/* Pulsing animation */}
+          <div
+            className="mx-auto w-fit border border-brand-primary/20 p-6 rounded-2xl relative overflow-hidden"
+            style={{
+              background: 'linear-gradient(90deg, rgba(96, 37, 159, 0.05), rgba(96, 37, 159, 0.15), rgba(96, 37, 159, 0.05))',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 2s infinite'
+            }}
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex gap-1.5">
+                <span className="w-2 h-2 bg-brand-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-2 h-2 bg-brand-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-2 h-2 bg-brand-primary rounded-full animate-bounce" />
+              </div>
+              <span className="text-lg font-medium text-brand-primary">
+                Analyzing your request...
+              </span>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen px-4 overflow-hidden bg-brand-dark">

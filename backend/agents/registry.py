@@ -66,16 +66,19 @@ class SkillRegistry:
         from agents.ux_agent import run_ux_agent
         from agents.seo_agent import run_seo_agent
         from agents.copy_agent import run_copy_agent
+        from agents.direction_lock_agent import run_direction_lock_agent
+        from agents.structure_confirm_agent import run_structure_confirm_agent
+        from agents.reveal_agent import run_reveal_agent
 
-        # INTAKE SKILL (Special: runs automatically, no explicit skill call)
+        # INTAKE SKILL (Non-blocking unless critical fields missing)
         self.register(Skill(
             id="intake",
             name="Intake & Audit",
-            description="Validates that all required project information is present",
+            description="Validates critical project information (audience, offer, location, goal)",
             agent_function=lambda state: state,  # Runs inline in router
             required_step="intake",
-            next_step="strategy",  # Changed: now hands off to strategy first
-            requires_approval=True,
+            next_step="strategy",
+            requires_approval=False,  # MAGICAL FLOW: Auto-proceed unless critical missing
             icon="📋",
             revision_supported=False
         ))
@@ -87,8 +90,21 @@ class SkillRegistry:
             description="Defines business goals, target audience, and success metrics",
             agent_function=run_strategy_agent,
             required_step="strategy",
-            next_step="ux",
+            next_step="direction_lock",  # MAGICAL FLOW: Strategy → Direction Lock
             requires_approval=False,  # Runs automatically after intake
+            icon="🎯",
+            revision_supported=True
+        ))
+
+        # DIRECTION LOCK SKILL: Freeze strategic direction (GATE A)
+        self.register(Skill(
+            id="direction_lock",
+            name="Direction Lock",
+            description="Creates and freezes a concise strategic direction snapshot",
+            agent_function=run_direction_lock_agent,
+            required_step="direction_lock",
+            next_step="ux",
+            requires_approval=True,  # GATE A: User must approve direction
             icon="🎯",
             revision_supported=True
         ))
@@ -100,21 +116,21 @@ class SkillRegistry:
             description="Maps user personas, pain points, and conversion paths",
             agent_function=run_ux_agent,
             required_step="ux",
-            next_step="planning",  # NEW SEQUENCE: UX → Planning
-            requires_approval=False,  # Runs automatically after strategy
+            next_step="structure_confirm",  # MAGICAL FLOW: UX → Structure Confirm
+            requires_approval=False,  # Runs automatically after direction_lock
             icon="🎨",
             revision_supported=True
         ))
 
-        # PLANNING SKILL: Sitemap Generation
+        # STRUCTURE CONFIRM SKILL: Sitemap approval (GATE B)
         self.register(Skill(
-            id="planning",
-            name="Sitemap Architect",
-            description="Designs high-fidelity website structure with pages and sections",
-            agent_function=run_planner_agent,
-            required_step="planning",
-            next_step="seo",  # NEW SEQUENCE: Planning → SEO (marketing starts after sitemap)
-            requires_approval=True,  # GATE 1: Stop for user approval of sitemap
+            id="structure_confirm",
+            name="Structure Confirm",
+            description="Generates and confirms site structure/sitemap",
+            agent_function=run_structure_confirm_agent,
+            required_step="structure_confirm",
+            next_step="seo",  # After structure approved → marketing pipeline
+            requires_approval=True,  # GATE B: User must approve sitemap
             icon="🏗️",
             revision_supported=True
         ))
@@ -139,9 +155,22 @@ class SkillRegistry:
             description="Generates production-ready HTML/CSS code",
             agent_function=self._placeholder_builder,
             required_step="building",
-            next_step=None,  # Final step
-            requires_approval=False,  # TWO-GATE: Auto-execute after PRD
+            next_step="reveal",  # MAGICAL FLOW: Building → Reveal
+            requires_approval=False,  # Auto-execute after PRD
             icon="🚀",
+            revision_supported=True
+        ))
+
+        # REVEAL SKILL: Interactive preview and feedback
+        self.register(Skill(
+            id="reveal",
+            name="Reveal & Refine",
+            description="Presents interactive preview and collects feedback",
+            agent_function=run_reveal_agent,
+            required_step="reveal",
+            next_step=None,  # Terminal state (feedback loop)
+            requires_approval=False,  # Non-blocking - feedback is optional
+            icon="🎉",
             revision_supported=True
         ))
 
@@ -164,8 +193,8 @@ class SkillRegistry:
             description="Generates section-specific headlines, subheaders, and CTAs",
             agent_function=run_copy_agent,
             required_step="copywriting",
-            next_step="prd",  # NEW SEQUENCE: Copywriting → PRD (GATE 2)
-            requires_approval=True,  # GATE 2: Stop for user approval of marketing
+            next_step="prd",  # Copywriting → PRD (no approval)
+            requires_approval=False,  # MAGICAL FLOW: Copy is draft, no blocking approval
             icon="✍️",
             revision_supported=True
         ))

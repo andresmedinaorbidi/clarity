@@ -4,7 +4,14 @@ import { Terminal, Maximize2, RefreshCw, Code, Layout, Check, Sparkles } from "l
 import ChatInterface from "./ChatInterface";
 import { AnimatePresence, motion } from "framer-motion";
 
-export default function BuilderSection({ state, onSend, loading }: any) {
+interface BuilderSectionProps {
+  state: any;
+  onSend?: (message: string) => void;
+  loading?: boolean;
+  hideChat?: boolean; // New prop to hide chat when used in BuildView
+}
+
+export default function BuilderSection({ state, onSend, loading, hideChat = false }: BuilderSectionProps) {
   const lastMsg = state.chat_history[state.chat_history.length - 1];
   const isThinking = loading && lastMsg?.role === "assistant" && lastMsg.content === "";
 
@@ -55,7 +62,7 @@ export default function BuilderSection({ state, onSend, loading }: any) {
   }, [state.generated_code]);
 
   return (
-    <div className="flex h-screen bg-brand-dark relative">
+    <div className={`flex ${hideChat ? 'h-full' : 'h-screen'} bg-brand-dark relative`}>
       {/* Success Toast Notification */}
       <AnimatePresence>
         {showSuccessToast && (
@@ -79,15 +86,17 @@ export default function BuilderSection({ state, onSend, loading }: any) {
         )}
       </AnimatePresence>
 
-      {/* Sidebar: Unified Chat */}
-      <div className="w-[380px]">
-        <ChatInterface
-          messages={state.chat_history}
-          onSend={onSend}
-          loading={loading}
-          isThinking={isThinking}
-        />
-      </div>
+      {/* Sidebar: Unified Chat - Hide if hideChat prop is true */}
+      {!hideChat && onSend && (
+        <div className="w-[380px]">
+          <ChatInterface
+            messages={state.chat_history}
+            onSend={onSend}
+            loading={loading}
+            isThinking={isThinking}
+          />
+        </div>
+      )}
 
       {/* Main Preview Area */}
       <div className="flex-1 flex flex-col p-6 bg-brand-dark">

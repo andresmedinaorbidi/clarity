@@ -6,6 +6,16 @@ class AgentReasoning(BaseModel):
     thought: str
     certainty: float
 
+class ProgressEvent(BaseModel):
+    timestamp: str
+    phase: str
+    message: str
+    artifact_refs: Optional[List[str]] = []
+
+class Assumptions(BaseModel):
+    suggested: Dict[str, Any] = {}  # AI-generated assumptions
+    approved: Dict[str, Any] = {}   # Locked after direction_lock
+
 class WebsiteState(BaseModel):
     # 1. User Inputs (The raw data)
     project_name: str = ""
@@ -40,3 +50,9 @@ class WebsiteState(BaseModel):
     ux_strategy: Optional[Dict[str, Any]] = None  # User personas, conversion maps
     copywriting: Optional[Dict[str, Any]] = None  # Headlines, body text
     context_summary: str = ""  # Compressed project history
+
+    # 6. Magical Flow Support
+    progress_events: List[Dict[str, Any]] = []  # Timeline of background progress
+    assumptions: Dict[str, Any] = {"suggested": {}, "approved": {}}  # Two-phase assumptions
+    direction_snapshot: str = ""  # Short snapshot from direction_lock
+    reveal_feedback: List[str] = []  # User feedback during reveal phase

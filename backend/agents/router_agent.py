@@ -169,16 +169,20 @@ def run_router_agent(state: WebsiteState, user_message: str):
             current_skill = registry.get_by_step(state.current_step)
 
             if current_skill:
-                # Special check for intake: only proceed if we have all info
-                if state.current_step == "intake" and state.missing_info:
-                    print(f"[!] Cannot proceed from intake: missing {state.missing_info}")
-                    # Don't proceed, let chat response handle it
-                    pass
+                # MAGICAL FLOW: Check critical fields for intake auto-proceed
+                if state.current_step == "intake":
+                    critical_missing = [f for f in state.missing_info if f.lower() in ["audience", "offer", "location", "service area", "primary goal", "conversion goal"]]
+                    if critical_missing:
+                        print(f"[!] Cannot proceed from intake: critical fields missing: {critical_missing}")
+                        pass
+                    else:
+                        # Auto-proceed if only non-critical fields missing
+                        yield from _execute_skill_chain(state, current_skill, registry)
                 else:
                     # Execute skill chain (may include multiple auto-executing skills)
                     yield from _execute_skill_chain(state, current_skill, registry)
 
-        # REVISE: User wants to modify current deliverable
+        # REVISE: User wants to modify current deliverable (backward compat)
         elif action == "REVISE":
             current_skill = registry.get_by_step(state.current_step)
 
@@ -195,7 +199,7 @@ def run_router_agent(state: WebsiteState, user_message: str):
                 state.agent_reasoning.append(revision_reasoning)
 
                 # Short revision message
-                if state.current_step == "planning":
+                if state.current_step == "planning" or state.current_step == "structure_confirm":
                     yield "🔄 **Updating Sitemap**\n\n"
                 elif state.current_step == "prd":
                     yield "🔄 **Revising Spec**\n\n"
@@ -208,17 +212,56 @@ def run_router_agent(state: WebsiteState, user_message: str):
                 state.logs.append(f"System: Revision not supported for {state.current_step}")
                 print(f"[!] REVISION NOT SUPPORTED: {state.current_step}")
 
+        # EDIT_DIRECTION: Scoped action for direction_lock phase
+        elif action == "EDIT_DIRECTION":
+            if state.current_step == "direction_lock":
+                direction_skill = registry.get("direction_lock")
+                if direction_skill:
+                    print(f"[5.3] EDIT DIRECTION: Revising strategic direction")
+                    state.logs.append("System: Editing strategic direction based on feedback.")
+                    yield "🔄 **Revising Direction**\n\n"
+                    for chunk in direction_skill.execute(state, feedback=user_message):
+                        yield chunk
+            else:
+                state.logs.append("System: EDIT_DIRECTION only available during direction_lock phase")
+
+        # EDIT_STRUCTURE: Scoped action for structure_confirm phase
+        elif action == "EDIT_STRUCTURE":
+            if state.current_step == "structure_confirm":
+                structure_skill = registry.get("structure_confirm")
+                if structure_skill:
+                    print(f"[5.4] EDIT STRUCTURE: Revising sitemap")
+                    state.logs.append("System: Editing site structure based on feedback.")
+                    yield "🔄 **Revising Structure**\n\n"
+                    for chunk in structure_skill.execute(state, feedback=user_message):
+                        yield chunk
+            else:
+                state.logs.append("System: EDIT_STRUCTURE only available during structure_confirm phase")
+
+        # FEEDBACK: General feedback during reveal or post-approval phases
+        elif action == "FEEDBACK":
+            print(f"[5.5] FEEDBACK: User provided general feedback")
+            state.logs.append(f"System: Feedback logged: {user_message[:100]}")
+            # Store feedback but don't rewind - let chat response handle it
+            if state.current_step == "reveal":
+                reveal_skill = registry.get("reveal")
+                if reveal_skill:
+                    for chunk in reveal_skill.execute(state, feedback=user_message):
+                        yield chunk
+
         # --- PHASE 7: CHAT RESPONSE ---
         # We use prompts/chat_response.txt for the personality
         print(f"[7] GENERATING CHAT RESPONSE...")
 
-        # TWO-GATE APPROVAL: Define chat constraints for each phase
+        # MAGICAL FLOW: Define chat constraints for each phase
         constraints = {
-            "intake": "If missing_info is empty, congratulate them and tell them you have everything needed. Ask if they're ready to proceed. Wait for confirmation.",
-            "planning": "GATE 1: You've just architected a high-fidelity sitemap with pages and sections. Count the pages and say: 'I've designed a sitemap with [X] pages, each with specific sections. Review the Sitemap tab. Ready for me to write the marketing content?' Wait for approval.",
-            "copywriting": "GATE 2: You've finished the marketing strategy (SEO + Copy). Say: 'I've completed your SEO strategy and marketing copy for all sections. Please review the Marketing tab. Shall I begin the technical build?' Wait for approval before proceeding.",
-            "prd": "The PRD is being generated automatically. Keep it brief - just acknowledge that you're creating the technical specifications.",
-            "building": "The website is being built automatically. Talk about the code generation and preview."
+            "intake": "If only non-critical fields are missing, you can proceed automatically. If critical fields (audience, offer, goal, location) are missing, ask targeted questions.",
+            "direction_lock": "GATE A: You've crystallized the strategic direction. Present the direction snapshot concisely (3-5 bullets). Ask: 'Does this direction feel right?' Wait for approval.",
+            "structure_confirm": "GATE B: You've architected the site structure. Count the pages and say: 'I've designed a sitemap with [X] pages. Review the structure. Ready to proceed?' Wait for approval.",
+            "copywriting": "Copy is being generated as a draft. It will be refined during reveal. Keep it brief.",
+            "prd": "Technical specifications are being generated automatically. Keep it brief.",
+            "building": "The website is being built automatically. Talk about the code generation.",
+            "reveal": "Present the website preview. Invite feedback but don't block - the user can refine or proceed to launch."
         }
 
         response_data = state.model_dump()
