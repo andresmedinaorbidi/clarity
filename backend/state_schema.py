@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
+<<<<<<< HEAD
 class AgentReasoning(BaseModel):
     agent_name: str
     thought: str
@@ -16,15 +17,17 @@ class Assumptions(BaseModel):
     suggested: Dict[str, Any] = {}  # AI-generated assumptions
     approved: Dict[str, Any] = {}   # Locked after direction_lock
 
+=======
+>>>>>>> parent of 8cede23 (Multi Agent Version with registry)
 class WebsiteState(BaseModel):
     # 1. User Inputs (The raw data)
     project_name: str = ""
     industry: str = ""
-
+    
     brand_colors: List[str] = []  # e.g., ["Black", "Neon Green"]
     design_style: str = ""       # e.g., "Minimalist", "Cyberpunk"
 
-
+    
     # This allows you to add any "extra fields" later without breaking the app
     additional_context: Dict[str, Any] = {}
 
@@ -33,15 +36,16 @@ class WebsiteState(BaseModel):
 
     # 3. Agent Progress
     missing_info: List[str] = []  # List of things the Intake agent still needs
-    sitemap: List[Dict[str, Any]] = []  # High-fidelity: [{title, purpose, sections}]
+    sitemap: List[str] = []       # Populated by the Planner agent
     prd_document: str = ""        # Populated by the PRD agent
     generated_code: str = ""      # The final HTML/Tailwind result
-
+    
     # 4. Status Tracking
     current_step: str = "intake"  # intake, planning, building, etc.
     logs: List[str] = []          # History of what has happened
 
     chat_history: List[Dict[str, str]] = []
+<<<<<<< HEAD
 
     # 5. Extended Architecture Support
     project_meta: Dict[str, Any] = {}  # Brand guidelines, target audience, business goals, inferred_fields: List[str]
@@ -56,3 +60,5 @@ class WebsiteState(BaseModel):
     assumptions: Dict[str, Any] = {"suggested": {}, "approved": {}}  # Two-phase assumptions
     direction_snapshot: str = ""  # Short snapshot from direction_lock
     reveal_feedback: List[str] = []  # User feedback during reveal phase
+=======
+>>>>>>> parent of 8cede23 (Multi Agent Version with registry)

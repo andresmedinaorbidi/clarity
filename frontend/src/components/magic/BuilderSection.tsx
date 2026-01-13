@@ -1,8 +1,7 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import { Terminal, Maximize2, RefreshCw, Code, Layout, Check, Sparkles } from "lucide-react";
+import React from "react";
+import { Terminal, Maximize2, RefreshCw, Code, Layout } from "lucide-react";
 import ChatInterface from "./ChatInterface";
-import { AnimatePresence, motion } from "framer-motion";
 
 interface BuilderSectionProps {
   state: any;
@@ -14,54 +13,9 @@ interface BuilderSectionProps {
 export default function BuilderSection({ state, onSend, loading, hideChat = false }: BuilderSectionProps) {
   const lastMsg = state.chat_history[state.chat_history.length - 1];
   const isThinking = loading && lastMsg?.role === "assistant" && lastMsg.content === "";
-
-  // Magic Checklist state
-  const [checklistVisible, setChecklistVisible] = useState(false);
-  const [completedItems, setCompletedItems] = useState<number[]>([]);
-
-  // Success notification state
-  const [showSuccessToast, setShowSuccessToast] = useState(false);
-
-  const checklistItems = [
-    { id: 0, label: "Injecting SEO Keywords", icon: "🔍" },
-    { id: 1, label: "Applying Copywriting Strategy", icon: "✍️" },
-    { id: 2, label: "Implementing UX Flow", icon: "🎨" },
-    { id: 3, label: "Configuring Brand Colors", icon: "🎨" },
-    { id: 4, label: "Building Responsive Layout", icon: "📱" },
-  ];
-
-  // Show checklist when building starts
-  useEffect(() => {
-    if (state.current_step === "building" && loading && !state.generated_code) {
-      setChecklistVisible(true);
-      setCompletedItems([]);
-
-      // Sequentially check items
-      checklistItems.forEach((_, index) => {
-        setTimeout(() => {
-          setCompletedItems((prev) => [...prev, index]);
-        }, index * 600 + 400);
-      });
-    }
-
-    // Hide checklist once code starts streaming
-    if (state.generated_code) {
-      setTimeout(() => setChecklistVisible(false), 300);
-    }
-  }, [state.current_step, loading, state.generated_code]);
-
-  // Show success toast when builder loads with code
-  useEffect(() => {
-    if (state.generated_code && state.generated_code.length > 0) {
-      setShowSuccessToast(true);
-      const timer = setTimeout(() => {
-        setShowSuccessToast(false);
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [state.generated_code]);
-
+  
   return (
+<<<<<<< HEAD
     <div className={`flex ${hideChat ? 'h-full' : 'h-screen'} bg-brand-dark relative`}>
       {/* Success Toast Notification */}
       <AnimatePresence>
@@ -97,6 +51,18 @@ export default function BuilderSection({ state, onSend, loading, hideChat = fals
           />
         </div>
       )}
+=======
+    <div className="flex h-screen bg-brand-dark">
+       {/* Sidebar: Unified Chat */}
+      <div className="w-[380px]">
+        <ChatInterface
+          messages={state.chat_history}
+          onSend={onSend}
+          loading={loading}
+          isThinking={isThinking}
+        />
+      </div>
+>>>>>>> parent of 8cede23 (Multi Agent Version with registry)
 
       {/* Main Preview Area */}
       <div className="flex-1 flex flex-col p-6 bg-brand-dark">
@@ -120,81 +86,8 @@ export default function BuilderSection({ state, onSend, loading, hideChat = fals
               <p className="text-text-secondary text-xs max-w-xs font-mono">Converting PRD specifications into Tailwind CSS & HTML components.</p>
             </div>
           )}
-
-          {/* Magic Checklist Overlay */}
-          <AnimatePresence>
-            {checklistVisible && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.3 }}
-                className="absolute inset-0 bg-brand-dark/95 backdrop-blur-sm flex items-center justify-center z-10"
-              >
-                <motion.div
-                  initial={{ y: 20 }}
-                  animate={{ y: 0 }}
-                  className="bg-brand-surface border-2 border-brand-primary/30 rounded-2xl p-8 shadow-2xl max-w-md w-full"
-                >
-                  <div className="flex items-center gap-3 mb-6">
-                    <Sparkles className="text-brand-primary animate-pulse" size={24} />
-                    <h3 className="text-lg font-bold text-text-primary">Building Your Website</h3>
-                  </div>
-
-                  <div className="space-y-3">
-                    {checklistItems.map((item) => {
-                      const isCompleted = completedItems.includes(item.id);
-                      return (
-                        <motion.div
-                          key={item.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: item.id * 0.15 }}
-                          className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
-                            isCompleted
-                              ? "bg-brand-primary/10 border border-brand-primary/30"
-                              : "bg-brand-surface border border-brand-border"
-                          }`}
-                        >
-                          <div
-                            className={`flex items-center justify-center w-6 h-6 rounded-full transition-all ${
-                              isCompleted
-                                ? "bg-brand-primary text-white scale-110"
-                                : "bg-brand-border text-text-muted"
-                            }`}
-                          >
-                            {isCompleted ? (
-                              <Check size={14} strokeWidth={3} />
-                            ) : (
-                              <div className="w-2 h-2 bg-text-muted/50 rounded-full" />
-                            )}
-                          </div>
-                          <span className="text-sm font-mono mr-2">{item.icon}</span>
-                          <span
-                            className={`text-sm font-medium transition-colors ${
-                              isCompleted ? "text-text-primary" : "text-text-muted"
-                            }`}
-                          >
-                            {item.label}
-                          </span>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="mt-6 pt-6 border-t border-brand-border">
-                    <div className="flex items-center gap-2 text-xs text-text-muted font-mono">
-                      <div className="w-2 h-2 bg-brand-primary rounded-full animate-pulse" />
-                      <span>Compiling production-ready code...</span>
-                    </div>
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {state.generated_code && (
-            <iframe
+            <iframe 
                 srcDoc={state.generated_code}
                 className="w-full h-full border-none"
                 title="Website Preview"

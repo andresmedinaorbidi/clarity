@@ -7,6 +7,7 @@ def run_intake_agent(state: WebsiteState) -> WebsiteState:
     # Critical fields: audience, offer, location/service area, primary conversion goal
     # 1. Prepare Data for Gemini
     state_dict = state.model_dump()
+<<<<<<< HEAD
     state_dict['format_instructions'] = """Return ONLY a plain JSON list of CRITICAL missing fields.
 Critical fields are: target audience, core offer/service, location/service area, primary conversion goal.
 Do NOT flag nice-to-have fields like industry, brand colors, or style preferences.
@@ -16,6 +17,10 @@ Example: ['Target Audience', 'Primary Conversion Goal']"""
     assumptions_list = state.project_meta.get("assumptions", [])
     state_dict['assumptions'] = ", ".join(assumptions_list) if assumptions_list else "None"
 
+=======
+    state_dict['format_instructions'] = "Return ONLY a plain JSON list of strings. Do not return a dictionary. Example: ['Industry', 'Brand Motto']"
+    
+>>>>>>> parent of 8cede23 (Multi Agent Version with registry)
     # 2. Get the prompt (Make sure your prompts/intake_agent.txt is updated to use these variables)
     filled_prompt = get_filled_prompt("intake_agent", state_dict)
     

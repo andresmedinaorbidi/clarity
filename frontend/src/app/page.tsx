@@ -6,7 +6,7 @@ import BuildView from "@/components/magic/BuildView";
 import RefinementSection from "@/components/magic/RefinementSection";
 import BuilderSection from "@/components/magic/BuilderSection";
 import AgentTrace from "@/components/magic/AgentTrace";
-import EngineeringStream from "@/components/magic/EngineeringStream";
+import ConstructionOverlay from "@/components/magic/ConstructionOverlay";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function Home() {
@@ -33,6 +33,7 @@ export default function Home() {
   // STEP DETERMINATION
   const isBuilderStep = state.current_step === "building" || state.current_step === "completed" || state.current_step === "builder";
 
+<<<<<<< HEAD
   // Engineering Stream: Show during PRD and building phases until code is complete
   const showEngineeringStream = (state.current_step === "prd" || state.current_step === "building") &&
                                  (!state.generated_code || state.generated_code.length === 0);
@@ -53,10 +54,12 @@ export default function Home() {
     );
   }
 
+=======
+>>>>>>> parent of 8cede23 (Multi Agent Version with registry)
   return (
     <main className="h-screen bg-brand-dark text-text-primary overflow-hidden">
       <AnimatePresence mode="wait">
-
+        
         {/* SCREEN 1: HERO (No messages yet) */}
         {chatCount === 0 && (
           <motion.div key="hero" className="h-full" {...fadeProps}>
@@ -65,34 +68,28 @@ export default function Home() {
         )}
 
         {/* SCREEN 2: PROCESSING (First prompt, AI hasn't spoken yet) */}
-        {chatCount === 2 && !isAiSpeaking && !isBuilderStep && !showEngineeringStream && (
+        {chatCount === 2 && !isAiSpeaking && !isBuilderStep && (
           <motion.div key="processing" className="h-full" {...fadeProps}>
             <ProcessingSection state={state} />
           </motion.div>
         )}
 
         {/* SCREEN 3: REFINEMENT (The Loop for Brief, Sitemap, and PRD) */}
-        {chatCount > 0 && (isAiSpeaking || chatCount > 2) && !isBuilderStep && !showEngineeringStream && (
+        {/* We stay here if we have messages and we are NOT in the builder phase yet */}
+        {chatCount > 0 && (isAiSpeaking || chatCount > 2) && !isBuilderStep && (
           <motion.div key="refinement" className="h-full" {...fadeProps}>
             <RefinementSection state={state} onSend={sendMessage} loading={loading} />
           </motion.div>
         )}
 
-        {/* SCREEN 4: ENGINEERING STREAM (Matrix-style build phase) */}
-        {showEngineeringStream && (
-          <EngineeringStream key="engineering-stream" state={state} />
+        {/* SHOW CONSTRUCTION OVERLAY: If we are in building step but have no code yet */}
+        {state.current_step === "building" && !state.generated_code && (
+          <ConstructionOverlay key="construction" />
         )}
 
-        {/* SCREEN 5: FINAL BUILDER (Website Preview) */}
-        {showFinalBuilder && (
-          <motion.div
-            key="final-builder"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            className="h-full"
-          >
+        {/* BUILDER SCREEN: Only shows when we have code */}
+        {state.current_step === "building" && state.generated_code && (
+          <motion.div key="builder" className="h-full" {...fadeProps}>
             <BuilderSection state={state} onSend={sendMessage} loading={loading} />
           </motion.div>
         )}

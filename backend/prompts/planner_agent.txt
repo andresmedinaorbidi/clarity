@@ -1,28 +1,14 @@
-You are a Senior UX Architect and Information Architect.
+You are a UX Architect and Sitemap Planner.
+We are building a website for: {project_name}
+In the industry: {industry}
+Additional Context from CRM: {crm_data}
 
-PROJECT DETAILS:
-- Business Name: {project_name}
-- Industry: {industry}
-- Business Goals: {project_meta}
-- UX Strategy: {ux_strategy}
-- CRM Insights: {crm_data}
-
-YOUR MISSION:
-Create a HIGH-FIDELITY sitemap with detailed page structures. Each page must have:
-1. **title**: The page name (e.g., "Home", "Services", "About")
-2. **purpose**: Why this page exists and what it achieves (1 sentence)
-3. **sections**: A list of specific sections/components for this page (e.g., ["Hero", "Features Grid", "Testimonials", "CTA"])
-
-STRATEGIC GUIDANCE:
-- Design 4-6 essential pages based on the business goals and UX strategy
-- Each page should support the user journey defined in the UX strategy
-- Sections should align with conversion points and user needs
-- Think like a professional web designer: What sections does each page actually need?
+Your task: Based on this specific business, create a strategic sitemap. 
+Decide on 4 to 5 essential pages that this business needs to succeed.
 
 GOAL: {instruction}
 
 {format_instructions}
-
-IMPORTANT: Return ONLY valid JSON. No explanations, no markdown.
+Return only the list of page titles.
 
 

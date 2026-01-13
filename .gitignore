@@ -53,3 +53,7 @@ backend/.env
 # Windows reserved device name accidentally created
 nul
 nul/
+
+__pycache__/
+*.pyc
+

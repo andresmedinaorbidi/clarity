@@ -25,7 +25,7 @@ def ask_gemini(prompt: str, json_mode: bool = False) -> str:
 def load_prompt(agent_name: str) -> str:
     file_path = f"prompts/{agent_name}.txt"
     if os.path.exists(file_path):
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, "r") as f:
             return f.read()
     return "Prompt file not found."
 
@@ -64,7 +64,7 @@ def stream_gemini(
 
     MODEL_MAP = {
         "default": "gemini-2.5-flash",
-        "flash": "gemini-2.0-flash",
+        "flash": "gemini-2.0-flash", 
         "pro": "gemini-3-flash-preview",
     }
 
@@ -84,6 +84,7 @@ def stream_gemini(
 
     except Exception as e:
         yield f" [Error: {str(e)}] "
+<<<<<<< HEAD
 
 def summarize_project_context(state) -> str:
     """
@@ -158,3 +159,5 @@ def emit_progress_event(state, phase: str, message: str, artifact_refs: Optional
     }
     state.progress_events.append(event)
     print(f"[PROGRESS EVENT] {phase}: {message}")
+=======
+>>>>>>> parent of 8cede23 (Multi Agent Version with registry)

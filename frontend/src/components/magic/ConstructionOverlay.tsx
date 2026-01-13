@@ -1,100 +1,50 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { motion } from "framer-motion";
-import { Layout, Code, Wand2, Check, Sparkles } from "lucide-react";
+import { Layout, Code, Wand2 } from "lucide-react";
 
 export default function ConstructionOverlay() {
-  const [completedItems, setCompletedItems] = useState<number[]>([]);
-
-  const checklistItems = [
-    { id: 0, label: "Injecting SEO Keywords & Meta Tags", icon: "🔍" },
-    { id: 1, label: "Applying Marketing Copy Strategy", icon: "✍️" },
-    { id: 2, label: "Implementing UX Conversion Flow", icon: "🎨" },
-    { id: 3, label: "Configuring Brand Colors & Theme", icon: "🎨" },
-    { id: 4, label: "Building Responsive Layout", icon: "📱" },
-  ];
-
-  useEffect(() => {
-    // Sequentially check items with staggered delays
-    checklistItems.forEach((_, index) => {
-      setTimeout(() => {
-        setCompletedItems((prev) => [...prev, index]);
-      }, index * 700 + 500);
-    });
-  }, []);
-
   return (
-    <div className="fixed inset-0 z-[200] bg-brand-dark/98 backdrop-blur-sm flex flex-col items-center justify-center p-12">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="max-w-2xl w-full"
+    <div className="fixed inset-0 z-[200] bg-brand-dark flex flex-col items-center justify-center p-12">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="max-w-sm w-full text-center space-y-8"
       >
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Sparkles className="text-brand-primary animate-pulse" size={32} />
-            <h2 className="text-3xl font-black text-text-primary">Building Your Website</h2>
-          </div>
-          <p className="text-sm text-text-secondary">
-            Transforming specialist insights into production-ready code
-          </p>
+        <div className="relative flex justify-center">
+            <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                className="w-48 h-48 rounded-full border border-brand-primary/20 border-t-brand-primary"
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+                <Wand2 size={48} className="text-brand-primary animate-bounce" />
+            </div>
         </div>
 
-        {/* Checklist */}
-        <div className="bg-brand-surface border-2 border-brand-primary/30 rounded-2xl p-8 shadow-2xl space-y-4">
-          {checklistItems.map((item) => {
-            const isCompleted = completedItems.includes(item.id);
-            return (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: item.id * 0.15, duration: 0.3 }}
-                className={`flex items-center gap-4 p-4 rounded-xl transition-all ${
-                  isCompleted
-                    ? "bg-brand-primary/10 border-2 border-brand-primary/30"
-                    : "bg-brand-dark border-2 border-brand-border"
-                }`}
-              >
-                {/* Checkmark Circle */}
-                <div
-                  className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-300 ${
-                    isCompleted
-                      ? "bg-brand-primary text-white scale-110"
-                      : "bg-brand-border text-text-muted"
-                  }`}
-                >
-                  {isCompleted ? (
-                    <Check size={18} strokeWidth={3} />
-                  ) : (
-                    <div className="w-3 h-3 bg-text-muted/50 rounded-full" />
-                  )}
+        <div className="space-y-2">
+            <h2 className="text-2xl font-black text-text-primary uppercase tracking-tighter italic">Generating Code</h2>
+            <p className="text-sm text-text-secondary leading-relaxed">
+                Transforming your sitemap and technical strategy into responsive Tailwind components.
+            </p>
+        </div>
+
+        {/* Simulated Progress Bar */}
+        <div className="w-full h-1 bg-brand-surface rounded-full overflow-hidden border border-brand-border">
+            <motion.div 
+                initial={{ width: "0%" }}
+                animate={{ width: "100%" }}
+                transition={{ duration: 3, repeat: Infinity }}
+                className="h-full bg-brand-primary"
+            />
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+            {['Vercel', 'Tailwind', 'React'].map(tech => (
+                <div key={tech} className="py-2 px-3 bg-brand-surface border border-brand-border rounded-lg text-[10px] font-bold text-brand-primary uppercase">
+                    {tech}
                 </div>
-
-                {/* Icon & Label */}
-                <span className="text-lg" role="img" aria-label={item.label}>
-                  {item.icon}
-                </span>
-                <span
-                  className={`text-base font-semibold transition-colors ${
-                    isCompleted ? "text-text-primary" : "text-text-muted"
-                  }`}
-                >
-                  {item.label}
-                </span>
-              </motion.div>
-            );
-          })}
-        </div>
-
-        {/* Footer */}
-        <div className="mt-8 pt-6 border-t border-brand-border text-center">
-          <div className="flex items-center justify-center gap-2 text-sm text-text-muted font-mono">
-            <div className="w-2 h-2 bg-brand-primary rounded-full animate-pulse" />
-            <span>Compiling production-ready HTML & Tailwind CSS...</span>
-          </div>
+            ))}
         </div>
       </motion.div>
     </div>

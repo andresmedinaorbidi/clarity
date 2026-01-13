@@ -1,62 +1,9 @@
 # backend/agents/router_agent.py
 import json
 import traceback # Added for better error reporting
-from utils import get_filled_prompt, ask_gemini, stream_gemini, log_agent_action, summarize_project_context
-from state_schema import WebsiteState, AgentReasoning
+from utils import get_filled_prompt, ask_gemini, stream_gemini, log_agent_action
+from state_schema import WebsiteState
 from services import mock_hubspot_fetcher
-from agents.registry import get_registry
-
-def _execute_skill_chain(state, current_skill, registry):
-    """
-    Helper function to execute a chain of skills.
-    Automatically chains skills that don't require approval.
-    Stops at skills that need user confirmation.
-    """
-    next_step = current_skill.get_handoff_suggestion()
-
-    while next_step:
-        # Transition to next step
-        state.current_step = next_step
-        state.logs.append(f"System: Moving to {next_step} phase.")
-
-        # Log handoff in agent reasoning
-        handoff_reasoning = AgentReasoning(
-            agent_name="Router",
-            thought=f"Transitioning from {current_skill.name} to {next_step} skill.",
-            certainty=1.0
-        )
-        state.agent_reasoning.append(handoff_reasoning)
-        print(f"[5.1] HANDOFF: {current_skill.id} -> {next_step}")
-
-        # Get and execute the next skill
-        next_skill = registry.get_by_step(next_step)
-        if next_skill:
-            # Short, distinctive handoff message for frontend detection
-            if next_step == "planning":
-                yield "🏗️ **Building Sitemap**\n\n"
-            elif next_step == "prd":
-                yield "📋 **Drafting Technical Spec**\n\n"
-            elif next_step == "building":
-                yield "🚀 **Starting Build**\n\n"
-            else:
-                yield f"{next_skill.icon} **{next_skill.name}**\n\n"
-
-            for chunk in next_skill.execute(state):
-                yield chunk
-
-            # Check if we should continue the chain
-            if next_skill.requires_approval:
-                # Stop here and wait for user approval
-                print(f"[5.2] SKILL CHAIN PAUSED: {next_skill.name} requires approval")
-                break
-            else:
-                # Continue to next skill automatically
-                print(f"[5.2] AUTO-CHAIN: {next_skill.name} completed, continuing...")
-                current_skill = next_skill
-                next_step = current_skill.get_handoff_suggestion()
-        else:
-            # No skill found for this step
-            break
 
 def run_router_agent(state: WebsiteState, user_message: str):
     print(f"\n[1] ROUTER STARTING... Message: {user_message}")
@@ -92,25 +39,6 @@ def run_router_agent(state: WebsiteState, user_message: str):
             print(f"[!] JSON PARSE ERROR: {e} | RAW: {extraction_raw}")
             decision = {"action": "CHAT", "updates": {}}
 
-        # --- PHASE 2.5: CAPTURE REASONING ---
-        reasoning_text = decision.get("reasoning", "No reasoning provided")
-        certainty = decision.get("certainty", 0.8)
-        assumptions_list = decision.get("assumptions", [])
-
-        # Create an AgentReasoning object and append to state
-        agent_thought = AgentReasoning(
-            agent_name="Router",
-            thought=reasoning_text,
-            certainty=certainty
-        )
-        state.agent_reasoning.append(agent_thought)
-        print(f"[4.5] REASONING CAPTURED: {reasoning_text} (Certainty: {certainty})")
-
-        # Store assumptions in project_meta for transparency
-        if assumptions_list:
-            state.project_meta["assumptions"] = state.project_meta.get("assumptions", []) + assumptions_list
-            print(f"[4.6] ASSUMPTIONS LOGGED: {assumptions_list}")
-
         # --- PHASE 3: APPLY UPDATES ---
         updates = decision.get("updates", {})
         if updates:
@@ -120,11 +48,6 @@ def run_router_agent(state: WebsiteState, user_message: str):
                 "colors": "brand_colors",
                 "style": "design_style"
             }
-
-            # Initialize inferred_fields list if it doesn't exist
-            if "inferred_fields" not in state.project_meta:
-                state.project_meta["inferred_fields"] = []
-
             for key, value in updates.items():
                 target_key = FIELD_MAP.get(key.lower(), key)
                 if hasattr(state, target_key) and value:
@@ -133,12 +56,6 @@ def run_router_agent(state: WebsiteState, user_message: str):
                         value = [value]
                     setattr(state, target_key, value)
                     print(f"    - Updated State: {target_key} = {value}")
-
-                    # Track inferred fields: if this key is in assumptions_list, mark it as inferred
-                    if key in assumptions_list or target_key in assumptions_list:
-                        if target_key not in state.project_meta["inferred_fields"]:
-                            state.project_meta["inferred_fields"].append(target_key)
-                            print(f"    - Marked as INFERRED: {target_key}")
 
         # --- PHASE 4: AUTO-CRM & AUDIT ---
         if state.project_name and not state.crm_data:
@@ -158,16 +75,28 @@ def run_router_agent(state: WebsiteState, user_message: str):
             pass
         print(f"[6] AUDIT COMPLETE. Missing info: {state.missing_info}")
 
-        # --- PHASE 5: SKILL REGISTRY ORCHESTRATION ---
+        # --- PHASE 5: THE STATE MACHINE (The "Phase Gate" Fix) ---
         action = decision.get("action", "CHAT")
-        registry = get_registry()
 
-        print(f"[5] SKILL ORCHESTRATION: Action={action}, Step={state.current_step}")
+        # 1. INTAKE -> PLANNING (Only when user says PROCEED and we have all info)
+        if state.current_step == "intake" and not state.missing_info and action == "PROCEED":
+            state.current_step = "planning"
+            state.logs.append("System: User confirmed. Moving to Planning phase.")
+            if not state.sitemap:
+                yield "🏗️ **Building Sitemap...**\n\n"
+                from agents.planner_agent import run_planner_agent
+                for chunk in run_planner_agent(state): yield chunk
 
-        # PROCEED: Advance to next skill (with phase gate approval)
-        if action == "PROCEED":
-            current_skill = registry.get_by_step(state.current_step)
+        # 2. PLANNING -> PRD (Only when user confirms the sitemap)
+        elif state.current_step == "planning" and action == "PROCEED":
+            state.current_step = "prd"  # Move to PRD step
+            state.logs.append("System: User approved sitemap. Moving to PRD phase.")
+            yield "📄 **Generating Technical PRD...**\n\n"
+            from agents.prd_agent import run_prd_agent
+            for chunk in run_prd_agent(state): yield chunk
+            # We STAY in "prd" step after this so the user can review it.
 
+<<<<<<< HEAD
             if current_skill:
                 # MAGICAL FLOW: Check critical fields for intake auto-proceed
                 if state.current_step == "intake":
@@ -183,9 +112,32 @@ def run_router_agent(state: WebsiteState, user_message: str):
                     yield from _execute_skill_chain(state, current_skill, registry)
 
         # REVISE: User wants to modify current deliverable (backward compat)
-        elif action == "REVISE":
-            current_skill = registry.get_by_step(state.current_step)
+=======
+        # 3. PRD -> BUILDING (Only when user confirms the PRD)
+        elif state.current_step == "prd" and action == "PROCEED":
+            state.current_step = "building"  # Move to Building step
+            state.logs.append("System: User approved PRD. Starting build phase.")
+            yield "🚀 **Starting the Build...**\n\n"
+            from agents.builder_agent import run_builder_agent
+            for chunk in run_builder_agent(state): yield chunk
 
+        # 3. THE REVISE TRIGGER (User wants changes)
+>>>>>>> parent of 8cede23 (Multi Agent Version with registry)
+        elif action == "REVISE":
+            if state.current_step == "planning":
+                yield "🔄 **Updating Sitemap...**\n\n"
+                from agents.planner_agent import run_planner_agent
+                for chunk in run_planner_agent(state, feedback=user_message): yield chunk
+            elif state.current_step == "prd":
+                yield "🔄 **Updating Technical Brief...**\n\n"
+                from agents.prd_agent import run_prd_agent
+                for chunk in run_prd_agent(state, feedback=user_message): yield chunk
+            elif state.current_step == "building":
+                yield "🛠️ **Tweaking the Code...**\n\n"
+                from agents.builder_agent import run_builder_agent
+                for chunk in run_builder_agent(state, feedback=user_message): yield chunk
+
+<<<<<<< HEAD
             if current_skill and current_skill.revision_supported:
                 print(f"[5.2] REVISION REQUESTED: {current_skill.name}")
                 state.logs.append(f"System: Revising {current_skill.name} based on feedback.")
@@ -211,6 +163,16 @@ def run_router_agent(state: WebsiteState, user_message: str):
             else:
                 state.logs.append(f"System: Revision not supported for {state.current_step}")
                 print(f"[!] REVISION NOT SUPPORTED: {state.current_step}")
+=======
+        # --- PHASE 6: REVISION LOGIC ---
+        elif action == "REVISE":
+            if state.current_step == "wireframing": # Editing Sitemap
+                from agents.planner_agent import run_planner_agent
+                for chunk in run_planner_agent(state, feedback=user_message): yield chunk
+            elif state.current_step == "building": # Editing PRD
+                from agents.prd_agent import run_prd_agent
+                for chunk in run_prd_agent(state, feedback=user_message): yield chunk
+>>>>>>> parent of 8cede23 (Multi Agent Version with registry)
 
         # EDIT_DIRECTION: Scoped action for direction_lock phase
         elif action == "EDIT_DIRECTION":
@@ -253,6 +215,7 @@ def run_router_agent(state: WebsiteState, user_message: str):
         # We use prompts/chat_response.txt for the personality
         print(f"[7] GENERATING CHAT RESPONSE...")
 
+<<<<<<< HEAD
         # MAGICAL FLOW: Define chat constraints for each phase
         constraints = {
             "intake": "If only non-critical fields are missing, you can proceed automatically. If critical fields (audience, offer, goal, location) are missing, ask targeted questions.",
@@ -262,16 +225,20 @@ def run_router_agent(state: WebsiteState, user_message: str):
             "prd": "Technical specifications are being generated automatically. Keep it brief.",
             "building": "The website is being built automatically. Talk about the code generation.",
             "reveal": "Present the website preview. Invite feedback but don't block - the user can refine or proceed to launch."
+=======
+        # Define a strict constraint based on the current step
+        constraints = {
+            "intake": "If missing_info is empty, congratulate them and tell them you have everything needed. Then ask: 'Ready to create the sitemap?' Wait for their confirmation. If still missing info, ask for it.",
+            "planning": "Present the sitemap and ask if they like it or want changes. DO NOT automatically move to PRD. Wait for explicit approval.",
+            "prd": "Present the technical PRD and ask for approval before building. Wait for them to say they're ready.",
+            "building": "Talk about the code and the live preview."
+>>>>>>> parent of 8cede23 (Multi Agent Version with registry)
         }
 
         response_data = state.model_dump()
         response_data['user_message'] = user_message
         response_data['response_strategy'] = constraints.get(state.current_step, "Be concise.")
         response_data['prd_length'] = len(state.prd_document)
-
-        # Pass assumptions to the chat response for acknowledgment
-        assumptions_str = ", ".join(state.project_meta.get("assumptions", []))
-        response_data['assumptions'] = assumptions_str if assumptions_str else "None"
 
         state.logs.append(f"Router decided to stay in {state.current_step} stage. Action: {action}")
         
@@ -284,19 +251,6 @@ def run_router_agent(state: WebsiteState, user_message: str):
 
         # --- PHASE 8: FINAL WRAP UP ---
         state.chat_history.append({"role": "assistant", "content": full_response})
-
-        # --- PHASE 8.5: MEMORY COMPRESSION ---
-        # Trigger summarization if chat history is getting long (every 5 turns)
-        chat_turn_count = len(state.chat_history) // 2  # Each turn = user + assistant
-        if chat_turn_count > 0 and chat_turn_count % 5 == 0:
-            print(f"[8.5] MEMORY COMPRESSION: Summarizing project context (Turn {chat_turn_count})")
-            try:
-                state.context_summary = summarize_project_context(state)
-                state.logs.append("System: Project context compressed and saved to memory.")
-                print(f"[8.5] SUMMARY GENERATED: {state.context_summary[:100]}...")
-            except Exception as e:
-                print(f"[!] SUMMARIZATION ERROR: {str(e)}")
-                state.logs.append(f"System: Memory compression failed: {str(e)}")
 
         # 2. Convert to DICT first (Crucial: this strips Pydantic's extra escaping)
         state_dict = state.model_dump()
