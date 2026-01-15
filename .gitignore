@@ -53,3 +53,5 @@ backend/.env
 # Windows reserved device name accidentally created
 nul
 nul/
+
+*-cwd
