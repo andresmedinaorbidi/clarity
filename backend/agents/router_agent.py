@@ -1,85 +1,270 @@
 # backend/agents/router_agent.py
+"""
+Intent-Driven Router Agent
+
+This router analyzes user messages to determine intent and invoke the appropriate skill.
+It supports both direct skill invocation and linear progression through the build flow.
+Includes automatic URL detection for the Research Agent.
+"""
+
 import json
-import traceback # Added for better error reporting
+import traceback
 from utils import get_filled_prompt, ask_gemini, stream_gemini, log_agent_action, summarize_project_context
 from state_schema import WebsiteState, AgentReasoning
 from services import mock_hubspot_fetcher
 from agents.registry import get_registry
+from utils_scraper import extract_url_from_text
 
-def _execute_skill_chain(state, current_skill, registry):
+
+def _execute_skill(state: WebsiteState, skill_id: str, feedback: str = None, registry=None):
     """
-    Helper function to execute a chain of skills.
-    Automatically chains skills that don't require approval.
-    Stops at skills that need user confirmation.
+    Execute a single skill and yield its output.
+    Updates state.current_step to reflect the active skill.
+
+    Args:
+        state: Current WebsiteState
+        skill_id: ID of the skill to execute
+        feedback: Optional feedback for revision mode
+        registry: SkillRegistry instance
+
+    Yields:
+        Chunks of text from the skill execution
     """
-    next_step = current_skill.get_handoff_suggestion()
+    if registry is None:
+        registry = get_registry()
 
-    while next_step:
-        # Transition to next step
-        state.current_step = next_step
-        state.logs.append(f"System: Moving to {next_step} phase.")
+    skill = registry.get(skill_id)
+    if not skill:
+        print(f"[!] Skill not found: {skill_id}")
+        yield f"[Error: Skill '{skill_id}' not found]"
+        return
 
-        # Log handoff in agent reasoning
-        handoff_reasoning = AgentReasoning(
-            agent_name="Router",
-            thought=f"Transitioning from {current_skill.name} to {next_step} skill.",
-            certainty=1.0
-        )
-        state.agent_reasoning.append(handoff_reasoning)
-        print(f"[5.1] HANDOFF: {current_skill.id} -> {next_step}")
+    # Update current step to this skill
+    old_step = state.current_step
+    state.current_step = skill_id
+    state.logs.append(f"System: Executing {skill.name} skill.")
 
-        # Get and execute the next skill
-        next_skill = registry.get_by_step(next_step)
-        if next_skill:
-            # Short, distinctive handoff message for frontend detection
-            if next_step == "planning":
-                yield "🏗️ **Building Sitemap**\n\n"
-            elif next_step == "prd":
-                yield "📋 **Drafting Technical Spec**\n\n"
-            elif next_step == "building":
-                yield "🚀 **Starting Build**\n\n"
-            else:
-                yield f"{next_skill.icon} **{next_skill.name}**\n\n"
+    print(f"[SKILL] Executing: {skill.id} ({skill.name})")
 
-            for chunk in next_skill.execute(state):
-                yield chunk
+    # Emit skill start indicator
+    yield f"{skill.icon} **{skill.name}**\n\n"
 
-            # Check if we should continue the chain
-            if next_skill.requires_approval:
-                # Stop here and wait for user approval
-                print(f"[5.2] SKILL CHAIN PAUSED: {next_skill.name} requires approval")
-                break
-            else:
-                # Continue to next skill automatically
-                print(f"[5.2] AUTO-CHAIN: {next_skill.name} completed, continuing...")
-                current_skill = next_skill
-                next_step = current_skill.get_handoff_suggestion()
-        else:
-            # No skill found for this step
+    # Execute the skill
+    try:
+        for chunk in skill.execute(state, feedback=feedback):
+            yield chunk
+
+        # Log success
+        state.logs.append(f"System: {skill.name} completed successfully.")
+        print(f"[SKILL] Completed: {skill.id}")
+
+    except Exception as e:
+        error_msg = f"Skill execution error ({skill.id}): {str(e)}"
+        print(f"[!] {error_msg}")
+        state.logs.append(f"Error: {error_msg}")
+        yield f"\n[Error during {skill.name}: {str(e)}]"
+
+
+def _execute_skill_chain(state: WebsiteState, start_skill_id: str, registry=None):
+    """
+    Execute a chain of auto-executing skills starting from the given skill.
+    Stops at skills that require approval (gates).
+
+    Args:
+        state: Current WebsiteState
+        start_skill_id: ID of the first skill in the chain
+        registry: SkillRegistry instance
+
+    Yields:
+        Chunks of text from all skills in the chain
+    """
+    if registry is None:
+        registry = get_registry()
+
+    current_skill_id = start_skill_id
+
+    while current_skill_id:
+        skill = registry.get(current_skill_id)
+        if not skill:
             break
 
+        # Execute this skill
+        yield from _execute_skill(state, current_skill_id, registry=registry)
+
+        # Check if this skill requires approval (is a gate)
+        if skill.requires_approval:
+            print(f"[CHAIN] Paused at gate: {skill.id}")
+            break
+
+        # Get the next skill in the chain
+        next_skill_id = skill.suggested_next
+        if next_skill_id:
+            next_skill = registry.get(next_skill_id)
+            if next_skill and next_skill.auto_execute:
+                print(f"[CHAIN] Auto-continuing to: {next_skill_id}")
+                current_skill_id = next_skill_id
+            else:
+                break
+        else:
+            break
+
+
+def _execute_intent(state: WebsiteState, decision: dict, user_message: str, registry=None):
+    """
+    Execute the appropriate action based on the Router's intent analysis.
+
+    This is the core intent-driven execution engine.
+
+    Args:
+        state: Current WebsiteState
+        decision: Parsed JSON decision from Router AI
+        user_message: Original user message
+        registry: SkillRegistry instance
+
+    Yields:
+        Chunks of text from skill execution
+    """
+    if registry is None:
+        registry = get_registry()
+
+    action = decision.get("action", "CHAT")
+    requested_skill = decision.get("requested_skill", "none")
+    natural_next_step = decision.get("natural_next_step")
+    revision_feedback = decision.get("revision_feedback", user_message)
+
+    print(f"[INTENT] Action: {action}, Skill: {requested_skill}, Next: {natural_next_step}")
+
+    # -------------------------------------------------------------------------
+    # ACTION: INVOKE - Direct skill invocation by user intent
+    # -------------------------------------------------------------------------
+    if action == "INVOKE" and requested_skill != "none":
+        skill = registry.get(requested_skill)
+
+        if skill and skill.can_invoke_directly:
+            # Check prerequisites (warn but don't block)
+            missing_prereqs = registry.check_prerequisites(requested_skill, state)
+            if missing_prereqs:
+                prereq_names = [registry.get(p).name for p in missing_prereqs if registry.get(p)]
+                print(f"[INTENT] Warning: Missing prerequisites for {requested_skill}: {missing_prereqs}")
+                state.logs.append(f"Note: Invoking {skill.name} without completing: {', '.join(prereq_names)}")
+
+            # Execute the skill with revision feedback if provided
+            yield from _execute_skill(state, requested_skill, feedback=revision_feedback, registry=registry)
+
+            # Log the reasoning
+            reasoning = AgentReasoning(
+                agent_name="Router",
+                thought=f"User intent detected: Invoke {skill.name}. {decision.get('reasoning', '')}",
+                certainty=decision.get("certainty", 0.85)
+            )
+            state.agent_reasoning.append(reasoning)
+        else:
+            state.logs.append(f"System: Cannot directly invoke skill '{requested_skill}'")
+            print(f"[!] Skill cannot be invoked directly: {requested_skill}")
+
+    # -------------------------------------------------------------------------
+    # ACTION: REVISE - Modify existing work for a skill
+    # -------------------------------------------------------------------------
+    elif action == "REVISE":
+        # Use requested_skill if specified, otherwise revise current step
+        target_skill_id = requested_skill if requested_skill != "none" else state.current_step
+        skill = registry.get(target_skill_id)
+
+        if skill and skill.revision_supported:
+            print(f"[INTENT] Revising: {target_skill_id}")
+
+            yield from _execute_skill(state, target_skill_id, feedback=revision_feedback, registry=registry)
+
+            # Log the revision
+            reasoning = AgentReasoning(
+                agent_name="Router",
+                thought=f"User requested revision of {skill.name}. Feedback: {revision_feedback[:100]}...",
+                certainty=decision.get("certainty", 0.85)
+            )
+            state.agent_reasoning.append(reasoning)
+        else:
+            state.logs.append(f"System: Revision not supported for '{target_skill_id}'")
+            print(f"[!] Revision not supported: {target_skill_id}")
+
+    # -------------------------------------------------------------------------
+    # ACTION: PROCEED - Move to next step in the flow
+    # -------------------------------------------------------------------------
+    elif action == "PROCEED":
+        # Special handling for intake phase
+        if state.current_step == "intake":
+            if state.missing_info:
+                print(f"[INTENT] Cannot proceed from intake: missing {state.missing_info}")
+                state.logs.append("System: Cannot proceed - still missing required information.")
+                return
+
+        # Determine the target: either the natural_next_step or derive from current
+        target_step = natural_next_step
+        if not target_step:
+            target_step = registry.get_natural_next_step(state.current_step)
+
+        if target_step:
+            print(f"[INTENT] Proceeding to: {target_step}")
+
+            # Execute the skill chain starting from target
+            yield from _execute_skill_chain(state, target_step, registry=registry)
+
+            # Log progression
+            reasoning = AgentReasoning(
+                agent_name="Router",
+                thought=f"User approved progression. Moving from {state.current_step} to {target_step} phase.",
+                certainty=decision.get("certainty", 0.90)
+            )
+            state.agent_reasoning.append(reasoning)
+        else:
+            state.logs.append("System: Already at final step or no next step available.")
+            print("[INTENT] No next step available")
+
+
 def run_router_agent(state: WebsiteState, user_message: str):
-    print(f"\n[1] ROUTER STARTING... Message: {user_message}")
-    yield " " # Immediate pulse to browser
+    """
+    Main router entry point - Intent-Driven Architecture.
+
+    Analyzes user messages to determine intent and routes to appropriate skills.
+    Supports: direct invocation, linear progression, revision, and chat.
+
+    Args:
+        state: Current WebsiteState
+        user_message: User's chat message
+
+    Yields:
+        Chunks of text for streaming response
+    """
+    print(f"\n[ROUTER] Starting... Message: {user_message[:50]}...")
+    yield " "  # Immediate pulse to browser
 
     try:
+        registry = get_registry()
+
         # --- PHASE 1: PREPARE PROMPT ---
-        # We must ensure EVERY variable in router_agent.txt is here
         state_dict = state.model_dump()
         state_dict['user_message'] = user_message
-        state_dict['format_instructions'] = "Return ONLY JSON."
-        
-        # Verify the file is found and filled
-        print(f"[2] LOADING PROMPT: router_agent.txt")
+
+        # Add state indicators for the prompt
+        state_dict['has_research'] = "Yes" if state.additional_context.get("research_data") else "No"
+        state_dict['has_brief'] = "Yes" if state.project_brief else "No"
+        state_dict['has_sitemap'] = "Yes" if state.sitemap else "No"
+        state_dict['has_seo'] = "Yes" if state.seo_data else "No"
+        state_dict['has_copy'] = "Yes" if state.copywriting else "No"
+        state_dict['has_prd'] = "Yes" if state.prd_document else "No"
+
+        # Add skill descriptions for intent matching
+        state_dict['skill_descriptions'] = registry.get_skill_descriptions_for_prompt()
+
+        print(f"[ROUTER] Loading prompt with skill descriptions")
         filled_prompt = get_filled_prompt("router_agent", state_dict)
-        
-        # --- PHASE 2: EXTRACTION ---
+
+        # --- PHASE 2: AI INTENT ANALYSIS ---
+        print(f"[ROUTER] Calling Gemini for intent analysis...")
         extraction_raw = ask_gemini(filled_prompt, json_mode=True)
 
-        # THE AGGRESSIVE CLEANER
+        # Clean JSON response
         clean_json = extraction_raw.strip()
         if "```" in clean_json:
-            # This removes ```json at the start and ``` at the end
             clean_json = clean_json.split("```")[1]
             if clean_json.startswith("json"):
                 clean_json = clean_json[4:]
@@ -87,192 +272,142 @@ def run_router_agent(state: WebsiteState, user_message: str):
 
         try:
             decision = json.loads(clean_json)
-            print(f"[4] CLEANED JSON: {decision}") # Watch your terminal for this!
+            print(f"[ROUTER] Decision: action={decision.get('action')}, skill={decision.get('requested_skill')}")
         except Exception as e:
-            print(f"[!] JSON PARSE ERROR: {e} | RAW: {extraction_raw}")
-            decision = {"action": "CHAT", "updates": {}}
+            print(f"[!] JSON parse error: {e}")
+            decision = {"action": "CHAT", "requested_skill": "none", "updates": {}}
 
-        # --- PHASE 2.5: CAPTURE REASONING ---
-        reasoning_text = decision.get("reasoning", "No reasoning provided")
+        # --- PHASE 3: CAPTURE REASONING ---
+        reasoning_text = decision.get("reasoning", "Processing user request")
         certainty = decision.get("certainty", 0.8)
         assumptions_list = decision.get("assumptions", [])
 
-        # Create an AgentReasoning object and append to state
+        # Store reasoning
         agent_thought = AgentReasoning(
             agent_name="Router",
             thought=reasoning_text,
             certainty=certainty
         )
         state.agent_reasoning.append(agent_thought)
-        print(f"[4.5] REASONING CAPTURED: {reasoning_text} (Certainty: {certainty})")
+        print(f"[ROUTER] Reasoning: {reasoning_text[:80]}... (Certainty: {certainty})")
 
-        # Store assumptions in project_meta for transparency
+        # Store assumptions
         if assumptions_list:
-            state.project_meta["assumptions"] = state.project_meta.get("assumptions", []) + assumptions_list
-            print(f"[4.6] ASSUMPTIONS LOGGED: {assumptions_list}")
+            existing_assumptions = state.project_meta.get("assumptions", [])
+            state.project_meta["assumptions"] = existing_assumptions + assumptions_list
+            print(f"[ROUTER] Assumptions: {assumptions_list}")
 
-        # --- PHASE 3: APPLY UPDATES ---
+        # --- PHASE 4: APPLY STATE UPDATES ---
         updates = decision.get("updates", {})
         if updates:
-            # We map common AI mistakes to our schema keys
             FIELD_MAP = {
                 "name": "project_name",
                 "colors": "brand_colors",
                 "style": "design_style"
             }
 
-            # Initialize inferred_fields list if it doesn't exist
             if "inferred_fields" not in state.project_meta:
                 state.project_meta["inferred_fields"] = []
 
             for key, value in updates.items():
+                if value is None:
+                    continue
                 target_key = FIELD_MAP.get(key.lower(), key)
                 if hasattr(state, target_key) and value:
-                    # Special check: colors must be a list
                     if target_key == "brand_colors" and isinstance(value, str):
                         value = [value]
                     setattr(state, target_key, value)
-                    print(f"    - Updated State: {target_key} = {value}")
+                    print(f"[ROUTER] Updated: {target_key} = {value}")
 
-                    # Track inferred fields: if this key is in assumptions_list, mark it as inferred
                     if key in assumptions_list or target_key in assumptions_list:
                         if target_key not in state.project_meta["inferred_fields"]:
                             state.project_meta["inferred_fields"].append(target_key)
-                            print(f"    - Marked as INFERRED: {target_key}")
 
-        # --- PHASE 4: AUTO-CRM & AUDIT ---
+        # --- PHASE 4.5: URL DETECTION FOR RESEARCH ---
+        # Check if user message contains a URL and store it for the Research Agent
+        detected_url = extract_url_from_text(user_message)
+        if detected_url:
+            state.additional_context["business_url"] = detected_url
+            state.logs.append(f"System: Detected URL - {detected_url}")
+            print(f"[ROUTER] URL detected: {detected_url}")
+
+        # --- PHASE 5: AUTO-CRM & AUDIT (if in intake) ---
         if state.project_name and not state.crm_data:
-            print(f"[5] FETCHING CRM FOR: {state.project_name}")
+            print(f"[ROUTER] Fetching CRM for: {state.project_name}")
             state.crm_data = mock_hubspot_fetcher(state.project_name)
 
-        # Only run the Intake/Auditor agent if we are still in the intake phase
         if state.current_step == "intake":
             from agents.intake_agent import run_intake_agent
             state = run_intake_agent(state)
 
-            # Log when intake is complete, but DON'T auto-advance
             if not state.missing_info:
-                state.logs.append("✅ Auditor: All required information gathered. Waiting for user confirmation.")
-        else:
-            # Optional: If we are past intake, we can skip the audit entirely to save tokens/time
-            pass
-        print(f"[6] AUDIT COMPLETE. Missing info: {state.missing_info}")
+                state.logs.append("Auditor: All required information gathered. Ready to proceed.")
 
-        # --- PHASE 5: SKILL REGISTRY ORCHESTRATION ---
+        print(f"[ROUTER] Audit complete. Missing info: {state.missing_info}")
+
+        # --- PHASE 6: EXECUTE INTENT ---
         action = decision.get("action", "CHAT")
-        registry = get_registry()
 
-        print(f"[5] SKILL ORCHESTRATION: Action={action}, Step={state.current_step}")
+        if action in ["INVOKE", "REVISE", "PROCEED"]:
+            yield from _execute_intent(state, decision, user_message, registry)
 
-        # PROCEED: Advance to next skill (with phase gate approval)
-        if action == "PROCEED":
-            current_skill = registry.get_by_step(state.current_step)
+        # --- PHASE 7: GENERATE CHAT RESPONSE ---
+        print(f"[ROUTER] Generating chat response...")
 
-            if current_skill:
-                # Special check for intake: only proceed if we have all info
-                if state.current_step == "intake" and state.missing_info:
-                    print(f"[!] Cannot proceed from intake: missing {state.missing_info}")
-                    # Don't proceed, let chat response handle it
-                    pass
-                else:
-                    # Execute skill chain (may include multiple auto-executing skills)
-                    yield from _execute_skill_chain(state, current_skill, registry)
-
-        # REVISE: User wants to modify current deliverable
-        elif action == "REVISE":
-            current_skill = registry.get_by_step(state.current_step)
-
-            if current_skill and current_skill.revision_supported:
-                print(f"[5.2] REVISION REQUESTED: {current_skill.name}")
-                state.logs.append(f"System: Revising {current_skill.name} based on feedback.")
-
-                # Log revision reasoning
-                revision_reasoning = AgentReasoning(
-                    agent_name="Router",
-                    thought=f"User requested changes to {current_skill.name}. Applying feedback: '{user_message[:50]}...'",
-                    certainty=0.9
-                )
-                state.agent_reasoning.append(revision_reasoning)
-
-                # Short revision message
-                if state.current_step == "planning":
-                    yield "🔄 **Updating Sitemap**\n\n"
-                elif state.current_step == "prd":
-                    yield "🔄 **Revising Spec**\n\n"
-                else:
-                    yield f"🔄 **Updating**\n\n"
-
-                for chunk in current_skill.execute(state, feedback=user_message):
-                    yield chunk
-            else:
-                state.logs.append(f"System: Revision not supported for {state.current_step}")
-                print(f"[!] REVISION NOT SUPPORTED: {state.current_step}")
-
-        # --- PHASE 7: CHAT RESPONSE ---
-        # We use prompts/chat_response.txt for the personality
-        print(f"[7] GENERATING CHAT RESPONSE...")
-
-        # TWO-GATE APPROVAL: Define chat constraints for each phase
+        # Define phase-specific response guidance
         constraints = {
-            "intake": "If missing_info is empty, congratulate them and tell them you have everything needed. Ask if they're ready to proceed. Wait for confirmation.",
-            "planning": "GATE 1: You've just architected a high-fidelity sitemap with pages and sections. Count the pages and say: 'I've designed a sitemap with [X] pages, each with specific sections. Review the Sitemap tab. Ready for me to write the marketing content?' Wait for approval.",
-            "copywriting": "GATE 2: You've finished the marketing strategy (SEO + Copy). Say: 'I've completed your SEO strategy and marketing copy for all sections. Please review the Marketing tab. Shall I begin the technical build?' Wait for approval before proceeding.",
-            "prd": "The PRD is being generated automatically. Keep it brief - just acknowledge that you're creating the technical specifications.",
-            "building": "The website is being built automatically. Talk about the code generation and preview."
+            "intake": "If missing_info is empty, congratulate them and ask if they're ready to proceed to strategy planning.",
+            "research": "Research is in progress. Mention that you're analyzing their business to provide expert insights.",
+            "strategy": "PROJECT BRIEF GATE: The Project Brief has been created. Tell the user you've analyzed their business and prepared a comprehensive strategy brief based on your research. Ask them to review the brief above and confirm if it aligns with their vision, or let you know if they'd like any changes. This is an important approval step before moving to UX and sitemap planning.",
+            "ux": "Briefly explain user personas and conversion paths were mapped. Ask if they want to proceed to sitemap planning.",
+            "planning": "SITEMAP GATE: The sitemap is ready. Count pages and sections. Ask for approval before continuing to SEO/copy.",
+            "seo": "SEO keywords and meta data are ready. Brief summary.",
+            "copywriting": "MARKETING GATE: Marketing copy is complete. Ask for approval before technical build.",
+            "prd": "Technical PRD is being generated.",
+            "building": "The website is being built. Describe what's happening."
         }
 
         response_data = state.model_dump()
         response_data['user_message'] = user_message
-        response_data['response_strategy'] = constraints.get(state.current_step, "Be concise.")
+        response_data['response_strategy'] = constraints.get(state.current_step, "Be helpful and concise.")
         response_data['prd_length'] = len(state.prd_document)
+        response_data['assumptions'] = ", ".join(state.project_meta.get("assumptions", [])) or "None"
 
-        # Pass assumptions to the chat response for acknowledgment
-        assumptions_str = ", ".join(state.project_meta.get("assumptions", []))
-        response_data['assumptions'] = assumptions_str if assumptions_str else "None"
+        state.logs.append(f"Router: Action={action}, Step={state.current_step}")
 
-        state.logs.append(f"Router decided to stay in {state.current_step} stage. Action: {action}")
-        
         chat_prompt = get_filled_prompt("chat_response", response_data)
-        
+
         full_response = ""
         for chunk in stream_gemini(chat_prompt, model_type="flash"):
             full_response += chunk
             yield chunk
 
-        # --- PHASE 8: FINAL WRAP UP ---
+        # --- PHASE 8: FINALIZE ---
         state.chat_history.append({"role": "assistant", "content": full_response})
 
-        # --- PHASE 8.5: MEMORY COMPRESSION ---
-        # Trigger summarization if chat history is getting long (every 5 turns)
-        chat_turn_count = len(state.chat_history) // 2  # Each turn = user + assistant
+        # Memory compression (every 5 turns)
+        chat_turn_count = len(state.chat_history) // 2
         if chat_turn_count > 0 and chat_turn_count % 5 == 0:
-            print(f"[8.5] MEMORY COMPRESSION: Summarizing project context (Turn {chat_turn_count})")
+            print(f"[ROUTER] Compressing memory (Turn {chat_turn_count})")
             try:
                 state.context_summary = summarize_project_context(state)
-                state.logs.append("System: Project context compressed and saved to memory.")
-                print(f"[8.5] SUMMARY GENERATED: {state.context_summary[:100]}...")
+                state.logs.append("System: Memory compressed.")
             except Exception as e:
-                print(f"[!] SUMMARIZATION ERROR: {str(e)}")
-                state.logs.append(f"System: Memory compression failed: {str(e)}")
+                print(f"[!] Summarization error: {str(e)}")
 
-        # 2. Convert to DICT first (Crucial: this strips Pydantic's extra escaping)
-        state_dict = state.model_dump()
-        
-        # LOGGING (This will now definitely show up because it's inside the try block)
+        # Log agent action
         log_agent_action("Router", user_message, extraction_raw)
 
-        # FINAL SYNC DELIMITER
-        # 3. Use standard json.dumps with ensure_ascii=False 
-        # This preserves the "real" characters rather than converting them to unicode codes
+        # Send state update to frontend
+        state_dict = state.model_dump()
         final_json = json.dumps(state_dict, ensure_ascii=False)
-        
-        # 4. Yield the marker with clear separation
+
         yield "\n\n|||STATE_UPDATE|||\n"
         yield final_json
 
-        print(f"[8] ROUTER FINISHED SUCCESSFULLY.")
+        print(f"[ROUTER] Completed successfully.")
 
     except Exception as e:
         print(f"\n[!] ROUTER CRITICAL ERROR: {str(e)}")
-        traceback.print_exc() # This prints the EXACT line number of the error
+        traceback.print_exc()
         yield f"\n\n[System Error: {str(e)}]"

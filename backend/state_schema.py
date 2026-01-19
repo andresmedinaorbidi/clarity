@@ -23,6 +23,7 @@ class WebsiteState(BaseModel):
 
     # 3. Agent Progress
     missing_info: List[str] = []  # List of things the Intake agent still needs
+    project_brief: str = ""       # Strategy synthesis - Markdown document for user approval
     sitemap: List[Dict[str, Any]] = []  # High-fidelity: [{title, purpose, sections}]
     prd_document: str = ""        # Populated by the PRD agent
     generated_code: str = ""      # The final HTML/Tailwind result
