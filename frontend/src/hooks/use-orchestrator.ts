@@ -1,5 +1,13 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  getProjectState,
+  sendChatMessage,
+  createNewSession,
+  getSessionId,
+  resetSession,
+  SessionError,
+} from "@/lib/api";
 
 export interface Message {
   role: "user" | "assistant";
@@ -26,66 +34,150 @@ export interface WebsiteState {
   missing_info: string[];
   logs: string[];
   current_step: string;
-  sitemap: SitemapPage[];  // High-fidelity: [{title, purpose, sections}]
+  sitemap: SitemapPage[];
   prd_document: string;
   generated_code: string;
   chat_history: Message[];
-  project_meta: Record<string, any>;  // Includes inferred_fields: string[]
+  project_meta: Record<string, unknown>;
   agent_reasoning: AgentReasoning[];
-  seo_data?: Record<string, any> | null;
-  ux_strategy?: Record<string, any> | null;
-  copywriting?: Record<string, any> | null;
+  seo_data?: Record<string, unknown> | null;
+  ux_strategy?: Record<string, unknown> | null;
+  copywriting?: Record<string, unknown> | null;
   context_summary: string;
+  _session_id?: string;
 }
 
+const DEFAULT_STATE: WebsiteState = {
+  project_name: "",
+  industry: "",
+  brand_colors: [],
+  design_style: "",
+  missing_info: [],
+  logs: [],
+  current_step: "intake",
+  sitemap: [],
+  prd_document: "",
+  generated_code: "",
+  chat_history: [],
+  project_meta: {},
+  agent_reasoning: [],
+  seo_data: null,
+  ux_strategy: null,
+  copywriting: null,
+  context_summary: "",
+};
+
 export function useOrchestrator() {
-  const [state, setState] = useState<WebsiteState>({
-    project_name: "",
-    industry: "",
-    brand_colors: [],
-    design_style: "",
-    missing_info: [],
-    logs: [],
-    current_step: "idle",
-    sitemap: [],
-    prd_document: "",
-    generated_code: "",
-    chat_history: [],
-    project_meta: {},
-    agent_reasoning: [],
-    seo_data: null,
-    ux_strategy: null,
-    copywriting: null,
-    context_summary: "",
-  });
+  const [state, setState] = useState<WebsiteState>(DEFAULT_STATE);
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const cleanMarkdown = (text: string) => {
     if (!text) return "";
-    return text.replace(/\\\\n/g, "\n").replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/```markdown/g, "").replace(/```/g, "").trim();
+    return text
+      .replace(/\\\\n/g, "\n")
+      .replace(/\\n/g, "\n")
+      .replace(/\\"/g, '"')
+      .replace(/```markdown/g, "")
+      .replace(/```/g, "")
+      .trim();
   };
 
-  const sendMessage = async (input: string) => {
+  /**
+   * Fetch existing state from backend on initial load.
+   * This allows users to refresh the page without losing progress.
+   */
+  const fetchInitialState = useCallback(async () => {
+    try {
+      setInitializing(true);
+      setError(null);
+
+      // Get or create session ID
+      const sid = getSessionId();
+      setSessionId(sid);
+      console.log("[Orchestrator] Using session:", sid);
+
+      // Fetch state from backend
+      const backendState = await getProjectState();
+      console.log("[Orchestrator] Loaded state from backend:", backendState.current_step);
+
+      // Merge backend state with defaults (in case backend has new fields)
+      setState((prev) => ({
+        ...DEFAULT_STATE,
+        ...backendState,
+        prd_document: cleanMarkdown(backendState.prd_document || ""),
+      }));
+    } catch (err) {
+      if (err instanceof SessionError) {
+        // Session is invalid/expired - reset and try again
+        console.warn("[Orchestrator] Session error, resetting:", err.message);
+        const newSid = resetSession();
+        setSessionId(newSid);
+        setError(null);
+        // State will be fresh from default
+        setState(DEFAULT_STATE);
+      } else {
+        console.error("[Orchestrator] Failed to fetch initial state:", err);
+        setError("Failed to connect to backend. Please ensure the server is running.");
+      }
+    } finally {
+      setInitializing(false);
+    }
+  }, []);
+
+  // Fetch state on mount
+  useEffect(() => {
+    fetchInitialState();
+  }, [fetchInitialState]);
+
+  /**
+   * Start a completely new project/session.
+   */
+  const startNewProject = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { session_id } = await createNewSession();
+      setSessionId(session_id);
+      setState(DEFAULT_STATE);
+
+      console.log("[Orchestrator] Started new project with session:", session_id);
+    } catch (err) {
+      console.error("[Orchestrator] Failed to create new session:", err);
+      setError("Failed to create new project. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Send a message to the chat endpoint with streaming support.
+   */
+  const sendMessage = useCallback(async (input: string) => {
     if (!input.trim()) return;
     setLoading(true);
+    setError(null);
 
+    // Optimistically add user message and empty assistant message
     setState((prev) => ({
       ...prev,
-      chat_history: [...prev.chat_history, { role: "user", content: input }, { role: "assistant", content: "" }],
+      chat_history: [
+        ...prev.chat_history,
+        { role: "user", content: input },
+        { role: "assistant", content: "" },
+      ],
     }));
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input }),
-      });
+      const response = await sendChatMessage(input);
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let fullStreamContent = "";
       let isInArtifactMode = false;
-      let artifactType: "sitemap" | "prd" | null = null;
 
       while (reader) {
         const { done, value } = await reader.read();
@@ -128,64 +220,107 @@ export function useOrchestrator() {
               ...prev,
               ...newState,
               prd_document: cleanMarkdown(newState.prd_document || prev.prd_document),
-              chat_history: [...prev.chat_history.slice(0, -1), { role: "assistant", content: assistantFinalText }],
+              chat_history: [
+                ...prev.chat_history.slice(0, -1),
+                { role: "assistant", content: assistantFinalText },
+              ],
             }));
 
             // Reset artifact mode
             isInArtifactMode = false;
-            artifactType = null;
           } catch (e) {
             console.log("JSON partial...", e);
           }
-          continue; // Skip normal processing when STATE_UPDATE is found
+          continue;
         }
 
         // ===== ARTIFACT MODE DETECTION =====
-        // Detect when we enter artifact generation phase
         if (!isInArtifactMode) {
           if (fullStreamContent.includes("🏗️ **Building Sitemap")) {
             isInArtifactMode = true;
-            artifactType = "sitemap";
             setState((prev) => ({
               ...prev,
               current_step: "planning",
-              chat_history: [...prev.chat_history.slice(0, -1), { role: "assistant", content: "[GENERATING_SITEMAP]" }],
+              chat_history: [
+                ...prev.chat_history.slice(0, -1),
+                { role: "assistant", content: "[GENERATING_SITEMAP]" },
+              ],
             }));
-            continue; // Skip normal processing
+            continue;
           }
 
           if (fullStreamContent.includes("📋 **Drafting Technical")) {
             isInArtifactMode = true;
-            artifactType = "prd";
             setState((prev) => ({
               ...prev,
               current_step: "prd",
-              chat_history: [...prev.chat_history.slice(0, -1), { role: "assistant", content: "[GENERATING_PRD]" }],
+              chat_history: [
+                ...prev.chat_history.slice(0, -1),
+                { role: "assistant", content: "[GENERATING_PRD]" },
+              ],
             }));
-            continue; // Skip normal processing
+            continue;
           }
         }
 
         // ===== ARTIFACT MODE: Keep placeholder, don't stream to chat =====
         if (isInArtifactMode) {
-          // Backend updates state.sitemap and state.prd_document directly
-          // We just need to keep the placeholder in chat_history
-          // The STATE_UPDATE will handle the final transition
           continue;
         }
 
         // ===== NORMAL CHAT STREAM =====
         setState((prev) => ({
           ...prev,
-          chat_history: [...prev.chat_history.slice(0, -1), { role: "assistant", content: fullStreamContent }],
+          chat_history: [
+            ...prev.chat_history.slice(0, -1),
+            { role: "assistant", content: fullStreamContent },
+          ],
         }));
       }
-    } catch (error) {
-      console.error("Stream error:", error);
+    } catch (err) {
+      if (err instanceof SessionError) {
+        // Handle session expiration during chat
+        console.warn("[Orchestrator] Session expired during chat:", err.message);
+        setError("Your session expired. Starting a new session...");
+        await fetchInitialState();
+      } else {
+        console.error("[Orchestrator] Stream error:", err);
+        setError("Failed to send message. Please try again.");
+
+        // Remove the empty assistant message on error
+        setState((prev) => ({
+          ...prev,
+          chat_history: prev.chat_history.slice(0, -1),
+        }));
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchInitialState]);
 
-  return { state, loading, sendMessage };
+  /**
+   * Manually refresh state from backend.
+   */
+  const refreshState = useCallback(async () => {
+    await fetchInitialState();
+  }, [fetchInitialState]);
+
+  /**
+   * Clear any error messages.
+   */
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  return {
+    state,
+    loading,
+    initializing,
+    sessionId,
+    error,
+    sendMessage,
+    startNewProject,
+    refreshState,
+    clearError,
+  };
 }
