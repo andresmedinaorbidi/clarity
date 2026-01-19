@@ -246,6 +246,9 @@ async def chat(
                     state_dict = json.loads(chunk)
                     # Remove internal fields before creating WebsiteState
                     state_dict.pop("_session_id", None)
+                    # Ensure crm_data is always a dict, never None
+                    if state_dict.get("crm_data") is None:
+                        state_dict["crm_data"] = {}
                     state = WebsiteState(**state_dict)
                 except Exception as e:
                     print(f"[!] Failed to parse state update: {e}")

@@ -334,7 +334,8 @@ def run_router_agent(state: WebsiteState, user_message: str):
         # --- PHASE 5: AUTO-CRM & AUDIT (if in intake) ---
         if state.project_name and not state.crm_data:
             print(f"[ROUTER] Fetching CRM for: {state.project_name}")
-            state.crm_data = mock_hubspot_fetcher(state.project_name)
+            crm_result = mock_hubspot_fetcher(state.project_name)
+            state.crm_data = crm_result if crm_result is not None else {}
 
         if state.current_step == "intake":
             from agents.intake_agent import run_intake_agent

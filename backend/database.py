@@ -92,7 +92,11 @@ def get_state(session_id: str) -> WebsiteState:
 
         # Reconstruct WebsiteState from JSON
         print(f"[DB] Loaded session: {session_id}")
-        return WebsiteState(**record.state_json)
+        state_json = record.state_json.copy()
+        # Ensure crm_data is always a dict, never None (for backward compatibility)
+        if state_json.get("crm_data") is None:
+            state_json["crm_data"] = {}
+        return WebsiteState(**state_json)
 
 
 def save_state(session_id: str, state: WebsiteState) -> None:

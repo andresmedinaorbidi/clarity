@@ -18,10 +18,5 @@ def mock_hubspot_fetcher(company_name: str) -> dict:
     if company_name in mock_database:
         return mock_database[company_name]
     
-    # NEW: If it doesn't match, return "Generic" data so the app doesn't break
-    #return {
-    #    "industry": "General Business",
-    #    "bio": f"A growth-oriented company named {company_name}.",
-    #    "colors": ["Blue", "Gray"],
-    #    "motto": "Innovation for tomorrow."
-    #}
+    # Return empty dict instead of None to maintain type consistency
+    return {}

@@ -1,0 +1,8 @@
+# Clarity Project Rules
+- This is a multi-agent AI website builder.
+- Backend: FastAPI, SQLAlchemy (SQLite), Pydantic (WebsiteState).
+- Frontend: Next.js, Tailwind CSS, Lucide icons.
+- Architecture: Intent-driven agents using a Skill Registry.
+- State: Shared WebsiteState object synchronized via SSE with |||STATE_UPDATE||| markers.
+- Roadmap: Always respect the Phase-based roadmap.
+- Current State: Phase 2 is complete. Moving to Phase 3 (Split-view UI).
