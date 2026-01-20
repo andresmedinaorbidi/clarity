@@ -1,4 +1,6 @@
 import os
+import json
+import re
 from google import genai
 from dotenv import load_dotenv
 from typing import Any
@@ -30,11 +32,42 @@ def load_prompt(agent_name: str) -> str:
 
 def get_filled_prompt(agent_name: str, state_dict: dict) -> str:
     raw_template = load_prompt(agent_name)
+    
+    # Extract all {variable} placeholders from template
+    # IMPORTANT: Only match {var} that is NOT already escaped (not {{var}})
+    # Match {var} but not {{var}} - use negative lookbehind and lookahead
+    template_vars = set(re.findall(r'(?<!\{)\{(\w+)\}(?!\})', raw_template))
+    
+    # Convert complex objects to safe string representations
+    # This prevents format patterns in dict/list string representations from being interpreted
+    # CRITICAL: Escape braces in ALL string values used in templates to prevent format interpretation
+    safe_dict = {}
+    for k, v in state_dict.items():
+        if isinstance(v, (dict, list)):
+            # Convert complex objects to JSON strings (JSON doesn't use Python's {key} format)
+            safe_dict[k] = json.dumps(v, ensure_ascii=False) if v else (json.dumps([]) if isinstance(v, list) else json.dumps({}))
+        elif isinstance(v, str) and k in template_vars:
+            # For ALL string values used in template, escape braces to prevent format interpretation
+            # This is necessary because values might contain format patterns from AI responses
+            safe_dict[k] = v.replace("{", "{{").replace("}", "}}")
+        else:
+            safe_dict[k] = v
+    
     try:
-        # We use .get() to avoid errors if a variable is missing
-        return raw_template.format(**state_dict)
-    except KeyError as e:
-        return f"Error: Missing variable {e}"
+        # Use regex-based replacement instead of .format() to avoid interpreting braces in values
+        # This prevents any format patterns in values from being interpreted as placeholders
+        result = raw_template
+        for var_name in template_vars:
+            if var_name in safe_dict:
+                # Use regex to replace {var_name} but not {{var_name}} (already escaped)
+                # Pattern: {var_name} that is not preceded by { and not followed by }
+                pattern = r'(?<!\{)\{' + re.escape(var_name) + r'\}(?!\})'
+                result = re.sub(pattern, str(safe_dict[var_name]), result)
+        
+        return result
+    except Exception as e:
+        # Fallback error handling
+        return f"Error: {str(e)}"
 
 def log_agent_action(agent_name: str, input_prompt: str, output: Any):
     try:

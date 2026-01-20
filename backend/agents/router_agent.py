@@ -386,6 +386,19 @@ def run_router_agent(state: WebsiteState, user_message: str):
         response_data['response_strategy'] = constraints.get(state.current_step, "Be helpful and concise.")
         response_data['prd_length'] = len(state.prd_document)
         response_data['assumptions'] = ", ".join(state.project_meta.get("assumptions", [])) or "None"
+        
+        # Convert complex objects to safe string representations to avoid format() interpreting braces
+        # When Python's .format() sees {key} in a string, it tries to find a variable named "key"
+        # Converting complex objects to JSON strings prevents this issue
+        if response_data.get('sitemap') and len(response_data['sitemap']) > 0:
+            response_data['sitemap'] = json.dumps(response_data['sitemap'], indent=2)
+        else:
+            response_data['sitemap'] = "No sitemap yet"
+        
+        if response_data.get('missing_info') and len(response_data['missing_info']) > 0:
+            response_data['missing_info'] = ", ".join(str(item) for item in response_data['missing_info'])
+        else:
+            response_data['missing_info'] = "None"
 
         state.logs.append(f"Router: Action={action}, Step={state.current_step}")
 
