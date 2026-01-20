@@ -117,7 +117,7 @@ export default function IntakeCard({ state, onApprove, loading = false }: Intake
           <Check className="text-brand-primary" size={20} />
         </div>
         <div>
-          <h2 className="text-2xl font-black text-brand-primary">Project Information</h2>
+          <h2 className="text-2xl font-black text-text-primary">Project Information</h2>
           <p className="text-sm text-text-secondary mt-1">
             Review the information we've gathered about your project
           </p>

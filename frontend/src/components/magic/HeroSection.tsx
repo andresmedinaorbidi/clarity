@@ -63,7 +63,7 @@ export default function HeroSection({ onStart, loading }: HeroSectionProps) {
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="absolute right-3 top-3 bottom-3 px-6 bg-brand-primary hover:bg-brand-primary/90 disabled:bg-brand-border disabled:text-text-muted text-white rounded-xl font-medium transition-all flex items-center gap-2 group"
+            className="absolute right-3 top-3 bottom-3 px-6 bg-brand-primary hover:bg-brand-primary/90 disabled:bg-brand-border disabled:text-text-muted text-text-primary rounded-xl font-medium transition-all flex items-center gap-2 group"
           >
             {loading ? "Thinking..." : "Generate"}
             <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />

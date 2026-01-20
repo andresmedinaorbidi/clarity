@@ -62,7 +62,7 @@ export default function ConstructionOverlay() {
                 <div
                   className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-300 ${
                     isCompleted
-                      ? "bg-brand-primary text-white scale-110"
+                      ? "bg-brand-primary text-text-primary scale-110"
                       : "bg-brand-border text-text-muted"
                   }`}
                 >

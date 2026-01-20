@@ -85,7 +85,7 @@ export default function ApprovalCard({
             ${
               disabled || isProcessing
                 ? "bg-brand-primary/20 text-brand-primary/50 cursor-not-allowed"
-                : "bg-green-500 hover:bg-green-600 text-white shadow-md hover:shadow-lg"
+                : "bg-text-primary hover:bg-text-primary/90 text-white shadow-md hover:shadow-lg"
             }
           `}
         >

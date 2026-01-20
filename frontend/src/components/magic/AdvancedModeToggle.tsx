@@ -14,12 +14,12 @@ export default function AdvancedModeToggle() {
       title={isAdvancedMode ? "Disable Advanced Mode" : "Enable Advanced Mode"}
     >
       {isAdvancedMode ? (
-        <Settings size={14} className="text-brand-primary" />
+        <Settings size={14} className="text-text-primary" />
       ) : (
-        <Sparkles size={14} className="text-text-secondary group-hover:text-brand-primary transition-colors" />
+        <Sparkles size={14} className="text-text-primary transition-colors" />
       )}
       <span className={`text-xs font-bold transition-colors ${
-        isAdvancedMode ? "text-brand-primary" : "text-text-secondary group-hover:text-text-primary"
+        isAdvancedMode ? "text-text-primary" : "text-text-secondary group-hover:text-text-primary"
       }`}>
         {isAdvancedMode ? "Advanced" : "Simple"}
       </span>

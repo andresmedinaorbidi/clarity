@@ -19,7 +19,7 @@ export default function ProcessingSection({ state }: any) {
             className="w-32 h-32 rounded-full border border-dashed border-brand-primary/30 flex items-center justify-center"
           />
           <div className="absolute inset-0 flex items-center justify-center">
-             <div className="w-16 h-16 rounded-3xl bg-brand-primary shadow-[0_0_30px_rgba(96,37,159,0.5)] flex items-center justify-center text-white">
+             <div className="w-16 h-16 rounded-3xl bg-brand-primary shadow-[0_0_30px_rgba(96,37,159,0.5)] flex items-center justify-center text-text-primary">
                 <Cpu size={32} className="animate-pulse" />
              </div>
           </div>

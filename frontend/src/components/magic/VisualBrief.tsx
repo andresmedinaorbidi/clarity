@@ -178,7 +178,7 @@ function extractColors(colorText: string, brandColors: string[]): Array<{ name: 
     new Map(colors.map((c) => [c.name.toLowerCase(), c])).values()
   );
 
-  return uniqueColors.length > 0 ? uniqueColors : [{ name: "Brand Primary", hex: "#60259f" }];
+  return uniqueColors.length > 0 ? uniqueColors : [{ name: "Brand Primary", hex: "#beff50" }];
 }
 
 // Generate a hex color from a color name (simple approximation)
@@ -306,51 +306,48 @@ export default function VisualBrief({ state }: VisualBriefProps) {
   const fonts = extractFonts(parsed.typography || "");
 
   return (
-    <div className="max-w-5xl mx-auto p-8 space-y-8">
+    <div className="max-w-5xl mx-auto py-8 space-y-12">
       {/* Core Idea */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-br from-brand-primary/10 to-brand-secondary/10 border-2 border-brand-primary/30 rounded-3xl p-10 text-center"
+        className="space-y-4"
       >
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <Target className="text-brand-primary" size={24} />
-          <h3 className="text-sm font-bold text-brand-primary uppercase tracking-wider">Core Idea</h3>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-brand-primary/20 flex items-center justify-center">
+            <Target className="text-brand-secondary" size={18} />
+          </div>
+          <h3 className="text-xs font-medium uppercase tracking-widest text-text-primary">Core Idea</h3>
         </div>
-        <p className="text-3xl font-black text-text-primary leading-tight max-w-3xl mx-auto">
-          {coreIdea}
-        </p>
+        <div className="border-t border-brand-border pt-6">
+          <p className="text-xl font-normal text-text-primary leading-relaxed max-w-3xl">
+            {coreIdea}
+          </p>
+        </div>
       </motion.div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-12">
         {/* Target Audience */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-brand-surface border border-brand-border rounded-2xl p-6 space-y-4"
+          className="space-y-4"
         >
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-              <Users className="text-blue-500" size={20} />
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-brand-primary/20 flex items-center justify-center">
+              <Users className="text-brand-secondary" size={18} />
             </div>
-            <h3 className="text-xl font-black text-brand-primary">Target Audience</h3>
+            <h3 className="text-sm font-medium text-text-primary">Target Audience</h3>
           </div>
-
-          {/* Persona Mockup */}
-          <div className="bg-white border-2 border-blue-200 rounded-xl p-5 space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-lg">
-                {state.project_name?.[0]?.toUpperCase() || "U"}
-              </div>
-              <div className="flex-1">
-                <p className="font-bold text-text-primary">Primary Persona</p>
-                <p className="text-xs text-text-secondary">{demographics}</p>
-              </div>
+          <div className="border-t border-brand-border pt-6 space-y-4">
+            <div>
+              <p className="text-xs font-medium text-text-muted mb-2 uppercase tracking-wide">Demographics</p>
+              <p className="text-sm font-normal text-text-primary leading-relaxed">{demographics}</p>
             </div>
-            <div className="pt-3 border-t border-blue-100">
-              <p className="text-xs font-bold text-text-muted mb-1">Characteristics</p>
-              <p className="text-sm text-text-secondary leading-relaxed">{psychographics}</p>
+            <div className="pt-4 border-t border-brand-border/50">
+              <p className="text-xs font-medium text-text-muted mb-2 uppercase tracking-wide">Psychographics</p>
+              <p className="text-sm font-normal text-text-secondary leading-relaxed">{psychographics}</p>
             </div>
           </div>
         </motion.div>
@@ -360,31 +357,30 @@ export default function VisualBrief({ state }: VisualBriefProps) {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-brand-surface border border-brand-border rounded-2xl p-6 space-y-4"
+          className="space-y-4"
         >
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-              <Sparkles className="text-purple-500" size={20} />
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-brand-primary/20 flex items-center justify-center">
+              <Sparkles className="text-brand-secondary" size={18} />
             </div>
-            <h3 className="text-xl font-black text-brand-primary">Brand Personality</h3>
+            <h3 className="text-sm font-medium text-text-primary">Brand Personality</h3>
           </div>
-
-          <div className="space-y-3">
+          <div className="border-t border-brand-border pt-6 space-y-4">
             <div>
-              <p className="text-xs font-bold text-text-muted mb-1">Primary</p>
-              <p className="text-lg font-bold text-text-primary">{primaryTrait}</p>
+              <p className="text-xs font-medium text-text-muted mb-2 uppercase tracking-wide">Primary</p>
+              <p className="text-sm font-normal text-text-primary">{primaryTrait}</p>
             </div>
-            <div>
-              <p className="text-xs font-bold text-text-muted mb-1">Secondary</p>
-              <p className="text-base text-text-secondary">{secondaryTrait}</p>
+            <div className="pt-4 border-t border-brand-border/50">
+              <p className="text-xs font-medium text-text-muted mb-2 uppercase tracking-wide">Secondary</p>
+              <p className="text-sm font-normal text-text-secondary">{secondaryTrait}</p>
             </div>
-            <div className="pt-3 border-t border-brand-border">
-              <p className="text-xs font-bold text-text-muted mb-1">Communication</p>
-              <p className="text-sm text-text-secondary">{communicationStyle}</p>
+            <div className="pt-4 border-t border-brand-border/50">
+              <p className="text-xs font-medium text-text-muted mb-2 uppercase tracking-wide">Communication</p>
+              <p className="text-sm font-normal text-text-secondary">{communicationStyle}</p>
             </div>
-            <div className="pt-3 border-t border-brand-border">
-              <p className="text-xs font-bold text-text-muted mb-1">Visual Direction</p>
-              <p className="text-sm text-text-secondary italic">{visualStyle}</p>
+            <div className="pt-4 border-t border-brand-border/50">
+              <p className="text-xs font-medium text-text-muted mb-2 uppercase tracking-wide">Visual Direction</p>
+              <p className="text-sm font-normal text-text-secondary">{visualStyle}</p>
             </div>
           </div>
         </motion.div>
@@ -395,34 +391,35 @@ export default function VisualBrief({ state }: VisualBriefProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="bg-brand-surface border border-brand-border rounded-2xl p-6"
+        className="space-y-4"
       >
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-lg bg-pink-500/10 flex items-center justify-center">
-            <Palette className="text-pink-500" size={20} />
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-brand-primary/20 flex items-center justify-center">
+            <Palette className="text-brand-secondary" size={18} />
           </div>
-          <h3 className="text-xl font-black text-brand-primary">Color Palette</h3>
+          <h3 className="text-sm font-medium text-text-primary">Color Palette</h3>
         </div>
-
-        <div className="flex flex-wrap gap-6">
-          {colors.map((color, i) => (
-            <div
-              key={i}
-              className="group relative flex flex-col items-center"
-            >
+        <div className="border-t border-brand-border pt-6">
+          <div className="flex flex-wrap gap-6">
+            {colors.map((color, i) => (
               <div
-                className="w-24 h-24 rounded-xl border-2 border-white shadow-lg transition-all group-hover:scale-110 group-hover:shadow-xl cursor-pointer"
-                style={{ backgroundColor: color.hex }}
-                title={`${color.name} - ${color.hex.toUpperCase()}`}
-              />
-              <div className="mt-3 text-center">
-                <p className="text-xs font-bold text-text-primary">{color.name}</p>
-                <p className="text-[10px] font-mono text-text-secondary mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {color.hex.toUpperCase()}
-                </p>
+                key={i}
+                className="group relative flex flex-col items-center"
+              >
+                <div
+                  className="w-20 h-20 rounded-lg border border-brand-border/50 transition-all group-hover:scale-105 cursor-pointer"
+                  style={{ backgroundColor: color.hex }}
+                  title={`${color.name} - ${color.hex.toUpperCase()}`}
+                />
+                <div className="mt-3 text-center">
+                  <p className="text-xs font-normal text-text-primary">{color.name}</p>
+                  <p className="text-[10px] font-mono text-text-secondary mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {color.hex.toUpperCase()}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </motion.div>
 
@@ -431,39 +428,40 @@ export default function VisualBrief({ state }: VisualBriefProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
-        className="bg-brand-surface border border-brand-border rounded-2xl p-6"
+        className="space-y-4"
       >
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-            <Type className="text-indigo-500" size={20} />
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-brand-primary/20 flex items-center justify-center">
+            <Type className="text-brand-secondary" size={18} />
           </div>
-          <h3 className="text-xl font-black text-brand-primary">Typography</h3>
+          <h3 className="text-sm font-medium text-text-primary">Typography</h3>
         </div>
-
-        <div className="space-y-4">
-          {fonts.map((font, i) => (
-            <div key={i} className="bg-white border border-brand-border rounded-xl p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-lg font-bold text-text-primary" style={{ fontFamily: font.family }}>
-                    {font.name}
-                  </p>
-                  <p className="text-xs text-text-muted">{font.category}</p>
+        <div className="border-t border-brand-border pt-6">
+          <div className="space-y-6">
+            {fonts.map((font, i) => (
+              <div key={i} className={i > 0 ? "pt-6 border-t border-brand-border/50" : ""}>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-base font-medium text-text-primary" style={{ fontFamily: font.family }}>
+                      {font.name}
+                    </p>
+                    <p className="text-xs text-text-muted mt-0.5">{font.category}</p>
+                  </div>
+                  <span className="text-xs font-normal text-text-secondary px-2 py-1">
+                    {font.usage}
+                  </span>
                 </div>
-                <span className="text-xs font-bold text-brand-primary bg-brand-primary/10 px-3 py-1 rounded-full">
-                  {font.usage}
-                </span>
+                <div className="space-y-2 mt-4">
+                  <p className="text-lg font-normal" style={{ fontFamily: font.family }}>
+                    The quick brown fox jumps
+                  </p>
+                  <p className="text-sm font-normal text-text-secondary" style={{ fontFamily: font.family }}>
+                    The quick brown fox jumps over the lazy dog. 1234567890
+                  </p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <p className="text-2xl font-bold" style={{ fontFamily: font.family }}>
-                  The quick brown fox jumps
-                </p>
-                <p className="text-base" style={{ fontFamily: font.family }}>
-                  The quick brown fox jumps over the lazy dog. 1234567890
-                </p>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </motion.div>
 
@@ -472,21 +470,21 @@ export default function VisualBrief({ state }: VisualBriefProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="bg-brand-surface border border-brand-border rounded-2xl p-6"
+        className="space-y-4"
       >
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-            <ImageIcon className="text-green-500" size={20} />
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-brand-primary/20 flex items-center justify-center">
+            <ImageIcon className="text-brand-secondary" size={18} />
           </div>
-          <h3 className="text-xl font-black text-brand-primary">Visual Direction</h3>
+          <h3 className="text-sm font-medium text-text-primary">Visual Direction</h3>
         </div>
-
-        {/* Simple Mockup */}
-        <div className="bg-white border-2 border-brand-border rounded-xl overflow-hidden shadow-lg">
+        <div className="border-t border-brand-border pt-6">
+          {/* Simple Mockup */}
+          <div className="bg-white border-2 border-brand-border rounded-xl overflow-hidden shadow-lg">
           {/* Mockup Header */}
           <div
             className="h-16 flex items-center justify-between px-6"
-            style={{ backgroundColor: colors[0]?.hex || "#60259f" }}
+            style={{ backgroundColor: colors[0]?.hex || "#beff50" }}
           >
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-white/20 rounded-lg" />
@@ -505,7 +503,7 @@ export default function VisualBrief({ state }: VisualBriefProps) {
               <div
                 className="h-8 rounded-lg"
                 style={{
-                  backgroundColor: colors[0]?.hex || "#60259f",
+                  backgroundColor: colors[0]?.hex || "#beff50",
                   width: "60%",
                   opacity: 0.9,
                 }}
@@ -533,7 +531,7 @@ export default function VisualBrief({ state }: VisualBriefProps) {
             <div className="flex gap-3">
               <div
                 className="px-6 py-3 rounded-lg text-white font-bold text-sm"
-                style={{ backgroundColor: colors[0]?.hex || "#60259f" }}
+                style={{ backgroundColor: colors[0]?.hex || "#beff50" }}
               >
                 Primary CTA
               </div>
@@ -542,6 +540,7 @@ export default function VisualBrief({ state }: VisualBriefProps) {
               </div>
             </div>
           </div>
+        </div>
         </div>
       </motion.div>
     </div>

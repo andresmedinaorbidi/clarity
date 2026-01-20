@@ -3,13 +3,13 @@
 
 :root {
   /* Light Theme Brand Palette */
-  --brand-dark: #ffffff;          /* Main background - pure white */
-  --brand-surface: #f8f9fa;       /* Card/surface backgrounds - very light gray */
-  --brand-border: #e5e7eb;        /* Border color - light gray */
+  --brand-dark: #f5f5eb;          /* Main background - cream */
+  --brand-surface: #fafaf5;       /* Card/surface backgrounds - lighter cream */
+  --brand-border: #d4d4c8;        /* Border color - subtle gray on cream */
 
-  --brand-primary: #60259f;       /* Your Company Blue */
-  --brand-secondary: #beff50;     /* Indigo */
-  --brand-accent: #60259f;        /* Purple */
+  --brand-primary: #beff50;        /* Primary green */
+  --brand-secondary: #a8e03d;      /* Complementary darker green */
+  --brand-accent: #60259f;        /* Purple - for AI-generated content only */
 
   /* Text colors for light theme */
   --text-primary: #111827;        /* Almost black for main text */

@@ -251,10 +251,10 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
               className={`
                 relative flex items-center justify-center w-10 h-10 rounded-lg transition-all
                 ${isActive
-                  ? "bg-brand-primary text-white"
+                  ? "bg-brand-primary text-text-primary"
                   : isDisabled
                   ? "text-text-muted opacity-40 cursor-not-allowed"
-                  : "text-text-secondary hover:text-text-primary hover:bg-brand-surface"}
+                  : "text-text-primary hover:bg-brand-surface"}
               `}
               title={tab.label}
             >
@@ -343,7 +343,7 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
               {activeTab === "brief" && (
                 <div className="max-w-4xl mx-auto space-y-6">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-3xl font-black text-brand-primary">Project Brief</h2>
+                    <h2 className="text-xs font-medium uppercase tracking-widest text-text-primary">Project Brief</h2>
                     {loading && (state.current_step === "strategy" || state.current_step === "research") && (
                       <div className="flex items-center gap-2 text-brand-primary animate-pulse text-xs font-bold">
                         <Sparkles size={14} /> Generating...
@@ -377,7 +377,9 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
               {activeTab === "sitemap" && (
                 <div className="max-w-5xl mx-auto space-y-6">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-3xl font-black text-brand-primary">Sitemap</h2>
+                    <h2 className="text-xs font-medium uppercase tracking-widest text-text-primary">
+                      Sitemap <span className="text-brand-secondary">({state.sitemap?.length || 0} {state.sitemap?.length === 1 ? "page" : "pages"} planned)</span>
+                    </h2>
                     {loading && state.current_step === "planning" && (
                       <div className="flex items-center gap-2 text-brand-primary animate-pulse text-xs font-bold">
                         <Sparkles size={14} /> Architecting...
@@ -411,7 +413,7 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
               {activeTab === "marketing" && (
                 <div className="max-w-4xl mx-auto space-y-6">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-3xl font-black text-brand-primary">Marketing Strategy</h2>
+                    <h2 className="text-3xl font-black text-text-primary">Marketing Strategy</h2>
                     {loading &&
                       (state.current_step === "seo" || state.current_step === "copywriting") && (
                         <div className="flex items-center gap-2 text-brand-primary animate-pulse text-xs font-bold">
@@ -445,7 +447,7 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
                             <div className="w-10 h-10 rounded-lg bg-brand-primary/10 flex items-center justify-center">
                               <Search className="text-brand-primary" size={20} />
                             </div>
-                            <h3 className="text-xl font-black text-brand-primary">SEO</h3>
+                            <h3 className="text-xl font-black text-text-primary">SEO</h3>
                           </div>
 
                           {state.seo_data.primary_keywords &&
@@ -459,7 +461,7 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
                                   {state.seo_data.primary_keywords.map((keyword: string, i: number) => (
                                     <span
                                       key={i}
-                                      className="px-3 py-1.5 bg-brand-primary text-white text-xs font-semibold rounded-full"
+                                      className="px-3 py-1.5 bg-brand-primary text-text-primary text-xs font-semibold rounded-full"
                                     >
                                       {keyword}
                                     </span>
@@ -509,7 +511,7 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
                             <div className="w-10 h-10 rounded-lg bg-brand-primary/10 flex items-center justify-center">
                               <Megaphone className="text-brand-primary" size={20} />
                             </div>
-                            <h3 className="text-xl font-black text-brand-primary">Copywriting</h3>
+                            <h3 className="text-xl font-black text-text-primary">Copywriting</h3>
                           </div>
 
                           {state.copywriting.page_copy &&
@@ -549,7 +551,7 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
                                           <p className="text-[9px] uppercase font-bold text-text-muted mb-2">
                                             CTA
                                           </p>
-                                          <div className="px-4 py-2.5 bg-brand-primary text-white text-sm font-bold rounded-lg inline-block">
+                                          <div className="px-4 py-2.5 bg-brand-primary text-text-primary text-sm font-bold rounded-lg inline-block">
                                             {copyData.cta_primary}
                                           </div>
                                         </div>
@@ -570,7 +572,7 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
               {activeTab === "prd" && (
                 <div className="max-w-4xl mx-auto space-y-6">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-3xl font-black text-brand-primary">Technical Specifications</h2>
+                    <h2 className="text-3xl font-black text-text-primary">Technical Specifications</h2>
                     {loading && state.current_step === "prd" && (
                       <div className="flex items-center gap-2 text-brand-primary animate-pulse text-xs font-bold">
                         <Sparkles size={14} /> Generating...

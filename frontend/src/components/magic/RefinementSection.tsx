@@ -406,7 +406,7 @@ export default function RefinementSection({ state, onSend, loading }: any) {
                         >
                           {/* Page Header */}
                           <div className="flex items-center gap-4">
-                            <span className="w-10 h-10 rounded-lg bg-brand-primary text-white flex items-center justify-center font-mono text-sm font-bold flex-shrink-0">
+                            <span className="w-10 h-10 rounded-lg bg-brand-primary text-text-primary flex items-center justify-center font-mono text-sm font-bold flex-shrink-0">
                               {i + 1}
                             </span>
                             <div className="flex-1">
@@ -530,7 +530,7 @@ export default function RefinementSection({ state, onSend, loading }: any) {
                                 <p className="text-[11px] uppercase font-bold text-brand-secondary mb-3 tracking-wider">
                                   Call to Action
                                 </p>
-                                <div className="inline-block px-6 py-3 bg-brand-primary text-white font-bold rounded-lg">
+                                <div className="inline-block px-6 py-3 bg-brand-primary text-text-primary font-bold rounded-lg">
                                   {state.copywriting.page_copy.Home.cta_primary}
                                 </div>
                               </div>
@@ -560,7 +560,7 @@ export default function RefinementSection({ state, onSend, loading }: any) {
                                 <p className="text-[10px] uppercase font-bold text-text-muted mb-3">Primary Keywords</p>
                                 <div className="flex flex-wrap gap-2">
                                   {(Array.isArray(state.seo_data?.primary_keywords) ? state.seo_data.primary_keywords : []).map((keyword: string, i: number) => (
-                                    <span key={i} className="px-3 py-1.5 bg-brand-primary text-white text-xs font-semibold rounded-full">
+                                    <span key={i} className="px-3 py-1.5 bg-brand-primary text-text-primary text-xs font-semibold rounded-full">
                                       {keyword}
                                     </span>
                                   ))}
@@ -701,7 +701,7 @@ export default function RefinementSection({ state, onSend, loading }: any) {
                                       {copyData.cta_primary && (
                                         <div className="flex-1">
                                           <p className="text-[9px] uppercase font-bold text-text-muted mb-2">Primary CTA</p>
-                                          <div className="px-4 py-2.5 bg-brand-primary text-white text-sm font-bold rounded-lg text-center">
+                                          <div className="px-4 py-2.5 bg-brand-primary text-text-primary text-sm font-bold rounded-lg text-center">
                                             {copyData.cta_primary}
                                           </div>
                                         </div>

@@ -137,7 +137,7 @@ export default function ChatInterface({ messages, onSend, loading, isThinking }:
             <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
               <div className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} w-full`}>
                 {msg.role === "user" ? (
-                  <div className="max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed bg-brand-primary text-white shadow-lg shadow-brand-primary/20">
+                  <div className="max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed bg-brand-primary text-text-primary shadow-lg shadow-brand-primary/20">
                     {msg.content}
                   </div>
                 ) : showMagicPulse ? (
@@ -201,7 +201,7 @@ export default function ChatInterface({ messages, onSend, loading, isThinking }:
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="absolute right-2 top-2 bottom-2 px-3 text-brand-primary hover:text-white hover:bg-brand-primary rounded-lg transition-all disabled:opacity-30"
+            className="absolute right-2 top-2 bottom-2 px-3 text-text-primary hover:bg-brand-primary/20 rounded-lg transition-all disabled:opacity-30"
           >
             <Send size={18} />
           </button>

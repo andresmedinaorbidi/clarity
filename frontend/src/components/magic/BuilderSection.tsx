@@ -150,7 +150,7 @@ export default function BuilderSection({ state, onSend, loading }: any) {
                           <div
                             className={`flex items-center justify-center w-6 h-6 rounded-full transition-all ${
                               isCompleted
-                                ? "bg-brand-primary text-white scale-110"
+                                ? "bg-brand-primary text-text-primary scale-110"
                                 : "bg-brand-border text-text-muted"
                             }`}
                           >
