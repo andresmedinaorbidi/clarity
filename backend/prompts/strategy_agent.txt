@@ -134,4 +134,10 @@ Create the brief using this exact structure:
 
 {instruction}
 
-**IMPORTANT:** Output ONLY the Markdown content. Do not wrap it in code blocks. Do not add any preamble or explanation before or after the brief.
+**IMPORTANT:** 
+- Output ONLY the Markdown content. Do not wrap it in code blocks. 
+- Do not add any preamble or explanation before or after the brief.
+- NEVER include JSON structures, code blocks, or raw data in your output.
+- Write in natural, human-readable language. Do not show technical data structures.
+- For example, write "Professional and approachable" NOT {"primary": "Professional", "secondary": "approachable"}
+- Write "Ages 25-45, tech-savvy professionals" NOT {"demographics": "Ages 25-45", "characteristics": "tech-savvy"}

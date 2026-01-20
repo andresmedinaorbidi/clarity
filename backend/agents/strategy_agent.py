@@ -108,6 +108,19 @@ def run_strategy_agent(state: WebsiteState, feedback: str = None):
         if clean_brief.endswith("```"):
             clean_brief = clean_brief[:-3]
         clean_brief = clean_brief.strip()
+        
+        # Remove JSON structures that might have leaked through
+        import re
+        # Remove JSON objects (e.g., {"key": "value"})
+        clean_brief = re.sub(r'\{[^{}]*"[^"]+":\s*"[^"]+"[^{}]*\}', '', clean_brief)
+        # Remove JSON arrays (e.g., ["item1", "item2"])
+        clean_brief = re.sub(r'\["[^"]+",\s*"[^"]+"[^\]]*\]', '', clean_brief)
+        # Remove inline JSON-like patterns in markdown
+        clean_brief = re.sub(r'\*\*[^:]+:\*\*\s*\{[^}]+\}', lambda m: m.group(0).split('{')[0].rstrip(), clean_brief)
+        clean_brief = re.sub(r'\*\*[^:]+:\*\*\s*\[[^\]]+\]', lambda m: m.group(0).split('[')[0].rstrip(), clean_brief)
+        # Clean up extra whitespace
+        clean_brief = re.sub(r'\n\s*\n\s*\n+', '\n\n', clean_brief)
+        clean_brief = clean_brief.strip()
 
         # 6. SAVE THE PROJECT BRIEF
         state.project_brief = clean_brief

@@ -35,6 +35,7 @@ export interface WebsiteState {
   logs: string[];
   current_step: string;
   sitemap: SitemapPage[];
+  project_brief: string;
   prd_document: string;
   generated_code: string;
   chat_history: Message[];
@@ -44,6 +45,8 @@ export interface WebsiteState {
   ux_strategy?: Record<string, unknown> | null;
   copywriting?: Record<string, unknown> | null;
   context_summary: string;
+  additional_context?: Record<string, unknown>;
+  crm_data?: Record<string, unknown>;
   _session_id?: string;
 }
 
@@ -56,6 +59,7 @@ const DEFAULT_STATE: WebsiteState = {
   logs: [],
   current_step: "intake",
   sitemap: [],
+  project_brief: "",
   prd_document: "",
   generated_code: "",
   chat_history: [],
@@ -65,6 +69,8 @@ const DEFAULT_STATE: WebsiteState = {
   ux_strategy: null,
   copywriting: null,
   context_summary: "",
+  additional_context: {},
+  crm_data: {},
 };
 
 export function useOrchestrator() {

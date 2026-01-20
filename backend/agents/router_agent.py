@@ -94,6 +94,9 @@ def _execute_skill_chain(state: WebsiteState, start_skill_id: str, registry=None
         # Check if this skill requires approval (is a gate)
         if skill.requires_approval:
             print(f"[CHAIN] Paused at gate: {skill.id}")
+            # Emit gate action marker for frontend approval card
+            gate_name = skill.name.upper().replace(" ", "_")
+            yield f"\n\n[GATE_ACTION: {gate_name}]\n"
             break
 
         # Get the next skill in the chain
@@ -151,6 +154,11 @@ def _execute_intent(state: WebsiteState, decision: dict, user_message: str, regi
             # Execute the skill with revision feedback if provided
             yield from _execute_skill(state, requested_skill, feedback=revision_feedback, registry=registry)
 
+            # Emit gate marker if skill requires approval
+            if skill.requires_approval:
+                gate_name = skill.name.upper().replace(" ", "_")
+                yield f"\n\n[GATE_ACTION: {gate_name}]\n"
+
             # Log the reasoning
             reasoning = AgentReasoning(
                 agent_name="Router",
@@ -174,6 +182,11 @@ def _execute_intent(state: WebsiteState, decision: dict, user_message: str, regi
             print(f"[INTENT] Revising: {target_skill_id}")
 
             yield from _execute_skill(state, target_skill_id, feedback=revision_feedback, registry=registry)
+
+            # Emit gate marker if skill requires approval
+            if skill.requires_approval:
+                gate_name = skill.name.upper().replace(" ", "_")
+                yield f"\n\n[GATE_ACTION: {gate_name}]\n"
 
             # Log the revision
             reasoning = AgentReasoning(
@@ -385,6 +398,10 @@ def run_router_agent(state: WebsiteState, user_message: str):
 
         # --- PHASE 8: FINALIZE ---
         state.chat_history.append({"role": "assistant", "content": full_response})
+
+        # Emit gate action for intake approval if intake is complete and no missing info
+        if state.current_step == "intake" and not state.missing_info:
+            yield "\n\n[GATE_ACTION: INTAKE_&_AUDIT]\n"
 
         # Memory compression (every 5 turns)
         chat_turn_count = len(state.chat_history) // 2
