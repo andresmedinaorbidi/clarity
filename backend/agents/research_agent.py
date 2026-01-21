@@ -10,7 +10,7 @@ that informs all downstream agents with industry insights and brand intelligence
 import json
 from typing import Optional
 from utils import get_filled_prompt, stream_gemini, ask_gemini, log_agent_action
-from utils_scraper import scrape_url, extract_url_from_text, generate_mock_research, is_valid_url
+from utils_scraper import scrape_url, extract_url_from_text, generate_mock_research, is_valid_url, normalize_url
 from state_schema import WebsiteState, AgentReasoning
 
 
@@ -60,18 +60,31 @@ def run_research_agent(state: WebsiteState, url: Optional[str] = None, feedback:
     scraped_content = None
     scrape_result = None
 
-    if url and is_valid_url(url):
-        scrape_result = scrape_url(url)
-        if scrape_result.get("success"):
-            scraped_content = scrape_result.get("content", "")
-            page_title = scrape_result.get("title", "")
-            meta_desc = scrape_result.get("meta_description", "")
+    if url:
+        # Normalize URL before validation and scraping
+        normalized_url = normalize_url(url) if not url.startswith(('http://', 'https://')) else url
+        
+        if is_valid_url(normalized_url):
+            scrape_result = scrape_url(normalized_url)
+            if scrape_result.get("success"):
+                scraped_content = scrape_result.get("content", "")
+                page_title = scrape_result.get("title", "")
+                meta_desc = scrape_result.get("meta_description", "")
 
-            yield f"Found: **{page_title}**\n"
-            if meta_desc:
-                yield f"_{meta_desc[:100]}..._\n\n"
+                yield f"Found: **{page_title}**\n"
+                if meta_desc:
+                    yield f"_{meta_desc[:100]}..._\n\n"
 
-            print(f"[RESEARCH] Scraped {len(scraped_content)} chars from {url}")
+                # Extract business name from page title if not provided
+                if not project_name and page_title:
+                    # Try to extract business name from title (remove common suffixes)
+                    title_clean = page_title.split('|')[0].split('-')[0].strip()
+                    if len(title_clean) > 3 and len(title_clean) < 50:
+                        state.project_name = title_clean
+                        state.logs.append(f"Research Agent: Extracted business name from page title: {title_clean}")
+                        print(f"[RESEARCH] Extracted business name: {title_clean}")
+
+                print(f"[RESEARCH] Scraped {len(scraped_content)} chars from {normalized_url}")
         else:
             error = scrape_result.get("error", "Unknown error")
             state.logs.append(f"Research Agent: Scraping failed - {error}")

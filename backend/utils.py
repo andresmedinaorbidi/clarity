@@ -43,18 +43,24 @@ def get_filled_prompt(agent_name: str, state_dict: dict) -> str:
     # CRITICAL: Escape braces in ALL string values used in templates to prevent format interpretation
     safe_dict = {}
     for k, v in state_dict.items():
-        if isinstance(v, (dict, list)):
-            # Convert complex objects to JSON strings (JSON doesn't use Python's {key} format)
-            safe_dict[k] = json.dumps(v, ensure_ascii=False) if v else (json.dumps([]) if isinstance(v, list) else json.dumps({}))
-        elif isinstance(v, str) and k in template_vars:
-            # For ALL string values used in template, escape braces to prevent format interpretation
-            # This is necessary because values might contain format patterns from AI responses
-            safe_dict[k] = v.replace("{", "{{").replace("}", "}}")
-        else:
-            safe_dict[k] = v
+        try:
+            if isinstance(v, (dict, list)):
+                # Convert complex objects to JSON strings (JSON doesn't use Python's {key} format)
+                # Use ensure_ascii=True to avoid \u escape sequences that cause regex issues
+                safe_dict[k] = json.dumps(v, ensure_ascii=True) if v else (json.dumps([]) if isinstance(v, list) else json.dumps({}))
+            elif isinstance(v, str) and k in template_vars:
+                # For ALL string values used in template, escape braces to prevent format interpretation
+                # This is necessary because values might contain format patterns from AI responses
+                safe_dict[k] = v.replace("{", "{{").replace("}", "}}")
+            else:
+                safe_dict[k] = v
+        except Exception as e:
+            # If JSON serialization fails, use a safe fallback
+            print(f"[!] Error serializing {k} for prompt: {str(e)}")
+            safe_dict[k] = str(v) if v else ""
     
     try:
-        # Use regex-based replacement instead of .format() to avoid interpreting braces in values
+        # Use regex-based replacement but with proper escaping
         # This prevents any format patterns in values from being interpreted as placeholders
         result = raw_template
         for var_name in template_vars:
@@ -62,12 +68,18 @@ def get_filled_prompt(agent_name: str, state_dict: dict) -> str:
                 # Use regex to replace {var_name} but not {{var_name}} (already escaped)
                 # Pattern: {var_name} that is not preceded by { and not followed by }
                 pattern = r'(?<!\{)\{' + re.escape(var_name) + r'\}(?!\})'
-                result = re.sub(pattern, str(safe_dict[var_name]), result)
+                replacement = str(safe_dict[var_name])
+                # Use a lambda to avoid regex escape sequence issues in replacement
+                result = re.sub(pattern, lambda m: replacement, result)
         
         return result
     except Exception as e:
-        # Fallback error handling
-        return f"Error: {str(e)}"
+        # Log the error but don't send error message to AI - use a fallback prompt
+        print(f"[!] Prompt filling error for {agent_name}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        # Return a minimal valid prompt instead of an error message
+        return f"Generate a response based on the following context. Error occurred during prompt preparation: {str(e)[:100]}"
 
 def log_agent_action(agent_name: str, input_prompt: str, output: Any):
     try:

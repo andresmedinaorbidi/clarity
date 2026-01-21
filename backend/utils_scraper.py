@@ -37,6 +37,13 @@ REMOVE_TAGS = [
 MAX_CONTENT_LENGTH = 8000
 
 
+def normalize_url(url: str) -> str:
+    """Add https:// if missing"""
+    if not url.startswith(('http://', 'https://')):
+        return f"https://{url}"
+    return url
+
+
 def is_valid_url(url: str) -> bool:
     """Check if a string is a valid URL."""
     try:
@@ -49,13 +56,32 @@ def is_valid_url(url: str) -> bool:
 def extract_url_from_text(text: str) -> Optional[str]:
     """
     Extract the first URL found in a text string.
+    Detects both full URLs (http://, https://) and domain-only URLs (e.g., "orbidi.com").
     Useful for detecting URLs in user messages.
     """
+    # Pattern for domain-only URLs: domain.com or www.domain.com
+    # Matches valid domain names with optional www prefix
+    domain_pattern = r'\b(?:www\.)?[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+'
+    
+    # Pattern for full URLs with http/https
     url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+    
+    # Try http/https URLs first (more specific)
     match = re.search(url_pattern, text)
     if match:
         url = match.group(0).rstrip('.,;:!?)')
-        return url if is_valid_url(url) else None
+        if is_valid_url(url):
+            return url
+    
+    # Try domain-only URLs (e.g., "orbidi.com")
+    match = re.search(domain_pattern, text)
+    if match:
+        domain = match.group(0).rstrip('.,;:!?)')
+        # Normalize by adding https://
+        normalized = normalize_url(domain)
+        if is_valid_url(normalized):
+            return normalized
+    
     return None
 
 
@@ -75,15 +101,16 @@ def clean_text(text: str) -> str:
 def scrape_url(url: str, timeout: float = 10.0) -> Dict[str, Any]:
     """
     Fetch and extract clean text content from a URL.
+    Automatically normalizes URLs (adds https:// if missing).
 
     Args:
-        url: The URL to scrape
+        url: The URL to scrape (can be domain-only or full URL)
         timeout: Request timeout in seconds
 
     Returns:
         Dict containing:
             - success: bool
-            - url: str (the scraped URL)
+            - url: str (the scraped URL, normalized)
             - title: str (page title)
             - content: str (cleaned text content)
             - meta_description: str (if available)
@@ -96,12 +123,18 @@ def scrape_url(url: str, timeout: float = 10.0) -> Dict[str, Any]:
             "error": "Scraping dependencies not installed"
         }
 
-    if not is_valid_url(url):
+    # Normalize URL before validation and scraping
+    normalized_url = normalize_url(url)
+    
+    if not is_valid_url(normalized_url):
         return {
             "success": False,
             "url": url,
             "error": "Invalid URL format"
         }
+    
+    # Use normalized URL for scraping
+    url = normalized_url
 
     try:
         print(f"[SCRAPER] Fetching: {url}")

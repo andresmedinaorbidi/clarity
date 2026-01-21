@@ -12,12 +12,13 @@ interface ApprovalCardProps {
 
 // Map gate types to user-friendly titles
 function getGateTitle(gateType: string): string {
-  const titleMap: Record<string, string> = {
-    PROJECT_BRIEF: "Project Brief Approval",
-    SITEMAP_ARCHITECT: "Sitemap Approval",
-    COPYWRITER: "Marketing Content Approval",
-    "INTAKE_&_AUDIT": "Intake Approval",
-  };
+        const titleMap: Record<string, string> = {
+            PROJECT_BRIEF: "Project Brief Approval",
+            SITEMAP_ARCHITECT: "Blueprint Approval",
+            BLUEPRINT: "Blueprint Approval",
+            COPYWRITER: "Marketing Content Approval",
+            "INTAKE_&_AUDIT": "Intake Approval",
+        };
 
   // Fallback: convert skill names to readable format
   if (titleMap[gateType]) {

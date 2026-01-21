@@ -16,6 +16,8 @@ import {
   Search,
   Check,
   Code,
+  Search as SearchIcon,
+  Layout,
 } from "lucide-react";
 import { WebsiteState } from "@/hooks/use-orchestrator";
 import { useAdvancedMode } from "@/contexts/AdvancedModeContext";
@@ -23,6 +25,8 @@ import AdvancedModeToggle from "./AdvancedModeToggle";
 import IntakeCard from "./IntakeCard";
 import VisualBrief from "./VisualBrief";
 import VisualSitemap from "./VisualSitemap";
+import ResearchScreen from "./ResearchScreen";
+import BlueprintScreen from "./BlueprintScreen";
 
 interface ArtifactWorkspaceProps {
   state: WebsiteState;
@@ -31,9 +35,11 @@ interface ArtifactWorkspaceProps {
 }
 
 type ArtifactTab = "brief" | "sitemap" | "marketing" | "preview" | "prd";
+type ScreenTab = "research" | "blueprint" | "preview";
 
 export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWorkspaceProps) {
   const { isAdvancedMode } = useAdvancedMode();
+  const [activeScreen, setActiveScreen] = useState<ScreenTab>("research");
   const [activeTab, setActiveTab] = useState<ArtifactTab>("brief");
   const [notifications, setNotifications] = useState<Set<ArtifactTab>>(new Set());
   const prevStateRef = useRef<WebsiteState | null>(null);
@@ -104,22 +110,20 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
     });
   };
 
-  // Auto-switch tabs based on current step and available artifacts
+  // Auto-switch tabs for Advanced Mode only (screens handle their own progression)
   useEffect(() => {
-    // Priority: Show the most relevant artifact based on current step
-    if (state.current_step === "planning" || (state.sitemap && state.sitemap.length > 0)) {
-      setActiveTab("sitemap");
-    } else if (
-      isAdvancedMode &&
-      (state.current_step === "seo" ||
-        state.current_step === "copywriting" ||
-        (state.seo_data || state.copywriting))
+    if (!isAdvancedMode) return;
+    
+    // Only auto-switch for advanced mode tabs
+    if (
+      state.current_step === "seo" ||
+      state.current_step === "copywriting" ||
+      (state.seo_data || state.copywriting)
     ) {
       setActiveTab("marketing");
     } else if (
-      isAdvancedMode &&
-      (state.current_step === "prd" ||
-        (state.prd_document && state.prd_document.length > 0))
+      state.current_step === "prd" ||
+      (state.prd_document && state.prd_document.length > 0)
     ) {
       setActiveTab("prd");
     } else if (
@@ -129,6 +133,8 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
       setActiveTab("preview");
     } else if (state.project_brief) {
       setActiveTab("brief");
+    } else if (state.sitemap && state.sitemap.length > 0) {
+      setActiveTab("sitemap");
     }
   }, [state.current_step, state.sitemap, state.seo_data, state.copywriting, state.generated_code, state.project_brief, state.prd_document, isAdvancedMode]);
 
@@ -219,12 +225,73 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdvancedMode]);
 
-  // Determine what to show in the main workspace
-  const inferredFields = (state.project_meta?.inferred_fields as string[]) || [];
-  const showIntake = state.current_step === "intake" && (state.project_name || state.industry || inferredFields.length > 0);
-  const showPlaceholder = !showIntake && !state.project_brief && !state.sitemap?.length && !state.seo_data && !state.copywriting && !state.generated_code;
+  // Determine which screen to show based on current_step (mapped to 3-screen UI)
+  // Screen 1 (Research): intake, research
+  const showResearchScreen = state.current_step === "intake" || state.current_step === "research";
+  // Screen 2 (Blueprint): strategy, ux, planning (all part of blueprint creation)
+  const showBlueprintScreen = state.current_step === "strategy" || state.current_step === "ux" || state.current_step === "planning" || (state.project_brief || state.sitemap?.length > 0);
+  // Screen 3 (Preview): seo, copywriting, prd, building (all behind the scenes, then preview)
+  const showPreviewScreen = state.current_step === "seo" || state.current_step === "copywriting" || state.current_step === "prd" || state.current_step === "building" || (state.generated_code && state.generated_code.length > 0);
+  
+  // Check if generated_code is valid HTML (not Python code or error)
+  const isValidHTML = state.generated_code && 
+    state.generated_code.length > 0 && 
+    !state.generated_code.includes("python") &&
+    !state.generated_code.includes("path =") &&
+    !state.generated_code.includes(".txt") &&
+    (state.generated_code.trim().startsWith("<!") || 
+     state.generated_code.trim().startsWith("<html") ||
+     state.generated_code.includes("<div") ||
+     state.generated_code.includes("<body"));
+  
+  // Auto-switch to appropriate screen based on state
+  useEffect(() => {
+    if (showResearchScreen) {
+      setActiveScreen("research");
+    } else if (showBlueprintScreen) {
+      setActiveScreen("blueprint");
+    } else if (showPreviewScreen) {
+      setActiveScreen("preview");
+    }
+  }, [showResearchScreen, showBlueprintScreen, showPreviewScreen]);
+  
+  // For Advanced Mode, still show tabs for technical details
+  const showAdvancedTabs = isAdvancedMode && (state.seo_data || state.copywriting || state.prd_document);
+  
+  // Define screen tabs (always visible)
+  const screenTabs: Array<{
+    id: ScreenTab;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    label: string;
+    available: boolean;
+  }> = [
+    {
+      id: "research",
+      icon: SearchIcon,
+      label: "Research",
+      available: showResearchScreen || state.project_name || state.industry,
+    },
+    {
+      id: "blueprint",
+      icon: Layout,
+      label: "Blueprint",
+      available: showBlueprintScreen || state.project_brief || state.sitemap?.length > 0,
+    },
+    {
+      id: "preview",
+      icon: Monitor,
+      label: "Preview",
+      available: showPreviewScreen || (state.generated_code && state.generated_code.length > 0),
+    },
+  ];
+  
+  const handleResearchApprove = () => {
+    if (onSend && !loading) {
+      onSend("Proceed");
+    }
+  };
 
-  const handleIntakeApprove = () => {
+  const handleBlueprintApprove = () => {
     if (onSend && !loading) {
       onSend("Proceed");
     }
@@ -232,185 +299,297 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
 
   return (
     <div className="flex flex-col h-full bg-brand-dark">
-      {/* Header with Advanced Mode Toggle - Hide tabs during intake */}
-      {!showIntake && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-brand-border bg-brand-surface">
-          <div className="flex items-center gap-1">
-            {/* Tab Navigation - Icon-based, compact */}
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          const isDisabled = !tab.available && !tab.hasUpdates;
-          const showNotification = tab.hasNotification && !isActive;
+      {/* Header with Screen Tabs and Advanced Mode Toggle - Always visible */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-brand-border bg-brand-surface">
+        <div className="flex items-center gap-1">
+          {/* Screen Navigation Tabs - Always visible */}
+          {screenTabs.map((screen) => {
+            const Icon = screen.icon;
+            const isActive = activeScreen === screen.id;
+            const isDisabled = !screen.available;
 
-          return (
-            <button
-              key={tab.id}
-              onClick={() => !isDisabled && handleTabClick(tab.id)}
-              disabled={isDisabled}
-              className={`
-                relative flex items-center justify-center w-10 h-10 rounded-lg transition-all
-                ${isActive
-                  ? "bg-brand-primary text-text-primary"
-                  : isDisabled
-                  ? "text-text-muted opacity-40 cursor-not-allowed"
-                  : "text-text-primary hover:bg-brand-surface"}
-              `}
-              title={tab.label}
-            >
-              <Icon size={18} />
-              {/* Active processing indicator (pulsing dot) */}
-              {tab.hasUpdates && !isActive && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-brand-secondary rounded-full animate-pulse" />
-              )}
-              {/* Background update notification (blue dot with pulse animation) */}
-              {showNotification && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-500 rounded-full"
-                >
-                  <motion.span
-                    className="absolute inset-0 bg-blue-500 rounded-full"
-                    animate={{
-                      scale: [1, 1.5, 1],
-                      opacity: [0.8, 0, 0.8],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                  />
-                </motion.span>
-              )}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={screen.id}
+                onClick={() => !isDisabled && setActiveScreen(screen.id)}
+                disabled={isDisabled}
+                className={`
+                  relative flex items-center justify-center w-10 h-10 rounded-lg transition-all
+                  ${isActive
+                    ? "bg-brand-primary text-text-primary"
+                    : isDisabled
+                    ? "text-text-muted opacity-40 cursor-not-allowed"
+                    : "text-text-primary hover:bg-brand-surface"}
+                `}
+                title={screen.label}
+              >
+                <Icon size={18} />
+              </button>
+            );
+          })}
+          
+          {/* Advanced Mode Tabs - Only in Advanced Mode */}
+          {isAdvancedMode && tabs.length > 0 && (
+            <>
+              <div className="w-px h-6 bg-brand-border mx-1" />
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                const isDisabled = !tab.available && !tab.hasUpdates;
+                const showNotification = tab.hasNotification && !isActive;
+
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => !isDisabled && handleTabClick(tab.id)}
+                    disabled={isDisabled}
+                    className={`
+                      relative flex items-center justify-center w-10 h-10 rounded-lg transition-all
+                      ${isActive
+                        ? "bg-brand-primary text-text-primary"
+                        : isDisabled
+                        ? "text-text-muted opacity-40 cursor-not-allowed"
+                        : "text-text-primary hover:bg-brand-surface"}
+                    `}
+                    title={tab.label}
+                  >
+                    <Icon size={18} />
+                    {/* Active processing indicator (pulsing dot) */}
+                    {tab.hasUpdates && !isActive && (
+                      <span className="absolute top-1 right-1 w-2 h-2 bg-brand-secondary rounded-full animate-pulse" />
+                    )}
+                    {/* Background update notification (blue dot with pulse animation) */}
+                    {showNotification && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-500 rounded-full"
+                      >
+                        <motion.span
+                          className="absolute inset-0 bg-blue-500 rounded-full"
+                          animate={{
+                            scale: [1, 1.5, 1],
+                            opacity: [0.8, 0, 0.8],
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          }}
+                        />
+                      </motion.span>
+                    )}
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
-        {/* Advanced Mode Toggle */}
+        {/* Advanced Mode Toggle - Always visible */}
         <AdvancedModeToggle />
-        </div>
-      )}
+      </div>
 
       {/* Artifact Content Area */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <AnimatePresence mode="wait">
-          {showIntake ? (
+          {/* Screen 1: Research & Understanding */}
+          {activeScreen === "research" && (showResearchScreen || state.project_name || state.industry) ? (
             <motion.div
-              key="intake"
+              key="research"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
               className="h-full"
             >
-              <IntakeCard state={state} onApprove={handleIntakeApprove} loading={loading} />
+              <ResearchScreen state={state} onApprove={handleResearchApprove} loading={loading} />
             </motion.div>
-          ) : showPlaceholder ? (
+          ) : activeScreen === "blueprint" && (showBlueprintScreen || state.project_brief || state.sitemap?.length > 0) ? (
+            /* Screen 2: Website Blueprint */
             <motion.div
-              key="placeholder"
+              key="blueprint"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+              className="h-full p-8"
+            >
+              <BlueprintScreen state={state} onApprove={handleBlueprintApprove} loading={loading} />
+            </motion.div>
+          ) : activeScreen === "preview" && (showPreviewScreen || state.generated_code) ? (
+            /* Screen 3: Build Preview */
+            <motion.div
+              key="preview"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+              className="h-full p-8"
+            >
+              {isValidHTML ? (
+                <div className="max-w-6xl mx-auto space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-medium uppercase tracking-widest text-text-primary">Build Preview</h2>
+                    {loading && state.current_step === "building" && (
+                      <div className="flex items-center gap-2 text-brand-primary animate-pulse text-xs font-bold">
+                        <Sparkles size={14} /> Building...
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-white border-2 border-brand-border rounded-2xl overflow-hidden" style={{ boxShadow: "0 10px 30px -5px rgba(190, 255, 80, 0.2)" }}>
+                    <iframe
+                      srcDoc={state.generated_code}
+                      className="w-full h-[600px] border-0"
+                      title="Website Preview"
+                      sandbox="allow-scripts allow-same-origin"
+                    />
+                  </div>
+                </div>
+              ) : state.generated_code && state.generated_code.length > 0 ? (
+                <div className="max-w-6xl mx-auto space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-medium uppercase tracking-widest text-text-primary">Build Preview</h2>
+                  </div>
+                  <div className="bg-brand-surface border border-brand-border rounded-2xl p-8">
+                    <div className="text-center space-y-4">
+                      <div className="w-16 h-16 bg-brand-primary/10 rounded-full flex items-center justify-center mx-auto">
+                        <Monitor className="text-brand-primary" size={32} />
+                      </div>
+                      <h3 className="text-lg font-bold text-text-primary">Code Generation in Progress</h3>
+                      <p className="text-sm text-text-secondary">
+                        The website code is being generated. Please wait...
+                      </p>
+                      {loading && (
+                        <div className="flex items-center justify-center gap-2 text-brand-primary text-xs font-bold mt-4">
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>Building...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative min-h-[400px] bg-brand-surface border border-brand-border rounded-2xl p-10 overflow-hidden">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center space-y-4">
+                    <div className="w-12 h-12 bg-brand-primary/10 rounded-full flex items-center justify-center">
+                      <Monitor className="text-brand-primary animate-pulse" size={24} />
+                    </div>
+                    <p className="text-sm font-bold text-brand-primary animate-pulse">
+                      Building Preview...
+                    </p>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            /* Fallback: Show placeholder or Advanced Mode tabs */
+            <motion.div
+              key="fallback"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               className="h-full flex items-center justify-center p-12"
             >
-              <div className="text-center space-y-4 max-w-md">
-                <div className="w-16 h-16 bg-brand-primary/10 rounded-full flex items-center justify-center mx-auto">
-                  <Sparkles className="text-brand-primary animate-pulse" size={32} />
+              {showAdvancedTabs ? (
+                /* Advanced Mode: Show tab content */
+                <div className="h-full p-8 w-full">
+                  {/* Advanced Mode tab content will be rendered below */}
                 </div>
-                <h3 className="text-xl font-bold text-text-primary">Waiting for Research...</h3>
-                <p className="text-sm text-text-secondary">
-                  The AI agents are analyzing your project and gathering insights. This workspace will populate as artifacts are generated.
-                </p>
-                {loading && (
-                  <div className="flex items-center justify-center gap-2 text-brand-primary text-xs font-bold mt-4">
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>Processing...</span>
+              ) : (
+                /* Placeholder */
+                <div className="text-center space-y-4 max-w-md">
+                  <div className="w-16 h-16 bg-brand-primary/10 rounded-full flex items-center justify-center mx-auto">
+                    <Sparkles className="text-brand-primary animate-pulse" size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold text-text-primary">Waiting for Research...</h3>
+                  <p className="text-sm text-text-secondary">
+                    The AI agents are analyzing your project and gathering insights. This workspace will populate as artifacts are generated.
+                  </p>
+                  {loading && (
+                    <div className="flex items-center justify-center gap-2 text-brand-primary text-xs font-bold mt-4">
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Processing...</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Advanced Mode Tab Content (only when tabs are visible) */}
+        {showAdvancedTabs && (
+          <div className="h-full p-8">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+                className="h-full"
+              >
+                {/* Advanced Mode tabs content */}
+                {activeTab === "brief" && (
+                  <div className="max-w-4xl mx-auto space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xs font-medium uppercase tracking-widest text-text-primary">Full Project Brief</h2>
+                      {loading && (state.current_step === "strategy" || state.current_step === "research") && (
+                        <div className="flex items-center gap-2 text-brand-primary animate-pulse text-xs font-bold">
+                          <Sparkles size={14} /> Generating...
+                        </div>
+                      )}
+                    </div>
+
+                    {state.project_brief ? (
+                      <VisualBrief state={state} />
+                    ) : (
+                      <div className="relative min-h-[400px] bg-brand-surface border border-brand-border rounded-2xl p-10 overflow-hidden">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center space-y-4">
+                          <div className="w-12 h-12 bg-brand-primary/10 rounded-full flex items-center justify-center">
+                            <FileText className="text-brand-primary animate-pulse" size={24} />
+                          </div>
+                          <p className="text-sm font-bold text-brand-primary animate-pulse">
+                            Generating Project Brief...
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="h-full p-8"
-            >
-              {/* Brief Tab */}
-              {activeTab === "brief" && (
-                <div className="max-w-4xl mx-auto space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xs font-medium uppercase tracking-widest text-text-primary">Project Brief</h2>
-                    {loading && (state.current_step === "strategy" || state.current_step === "research") && (
-                      <div className="flex items-center gap-2 text-brand-primary animate-pulse text-xs font-bold">
-                        <Sparkles size={14} /> Generating...
+
+                {activeTab === "sitemap" && (
+                  <div className="max-w-5xl mx-auto space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xs font-medium uppercase tracking-widest text-text-primary">
+                        Full Sitemap <span className="text-brand-secondary">({state.sitemap?.length || 0} {state.sitemap?.length === 1 ? "page" : "pages"})</span>
+                      </h2>
+                      {loading && state.current_step === "planning" && (
+                        <div className="flex items-center gap-2 text-brand-primary animate-pulse text-xs font-bold">
+                          <Sparkles size={14} /> Architecting...
+                        </div>
+                      )}
+                    </div>
+
+                    {state.sitemap && state.sitemap.length > 0 ? (
+                      <VisualSitemap state={state} />
+                    ) : (
+                      <div className="relative min-h-[400px] bg-brand-surface border border-brand-border rounded-2xl p-10 overflow-hidden">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center space-y-4">
+                          <div className="w-12 h-12 bg-brand-primary/10 rounded-full flex items-center justify-center">
+                            <Map className="text-brand-primary animate-pulse" size={24} />
+                          </div>
+                          <p className="text-sm font-bold text-brand-primary animate-pulse">
+                            Generating Sitemap...
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
+                )}
 
-                  {state.project_brief ? (
-                    <VisualBrief state={state} />
-                  ) : (
-                    <div className="relative min-h-[400px] bg-brand-surface border border-brand-border rounded-2xl p-10 overflow-hidden">
-                      <div className="absolute inset-0 flex flex-col items-center justify-center space-y-4">
-                        <div className="w-12 h-12 bg-brand-primary/10 rounded-full flex items-center justify-center">
-                          <FileText className="text-brand-primary animate-pulse" size={24} />
-                        </div>
-                        <p className="text-sm font-bold text-brand-primary animate-pulse">
-                          Generating Project Brief...
-                        </p>
-                        <div className="w-full px-20 space-y-3">
-                          <div className="h-3 bg-brand-border rounded-full w-3/4 animate-pulse" />
-                          <div className="h-3 bg-brand-border rounded-full w-full animate-pulse [animation-delay:0.2s]" />
-                          <div className="h-3 bg-brand-border rounded-full w-1/2 animate-pulse [animation-delay:0.4s]" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Sitemap Tab */}
-              {activeTab === "sitemap" && (
-                <div className="max-w-5xl mx-auto space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xs font-medium uppercase tracking-widest text-text-primary">
-                      Sitemap <span className="text-brand-secondary">({state.sitemap?.length || 0} {state.sitemap?.length === 1 ? "page" : "pages"} planned)</span>
-                    </h2>
-                    {loading && state.current_step === "planning" && (
-                      <div className="flex items-center gap-2 text-brand-primary animate-pulse text-xs font-bold">
-                        <Sparkles size={14} /> Architecting...
-                      </div>
-                    )}
-                  </div>
-
-                  {state.sitemap && state.sitemap.length > 0 ? (
-                    <VisualSitemap state={state} />
-                  ) : (
-                    <div className="relative min-h-[400px] bg-brand-surface border border-brand-border rounded-2xl p-10 overflow-hidden">
-                      <div className="absolute inset-0 flex flex-col items-center justify-center space-y-4">
-                        <div className="w-12 h-12 bg-brand-primary/10 rounded-full flex items-center justify-center">
-                          <Map className="text-brand-primary animate-pulse" size={24} />
-                        </div>
-                        <p className="text-sm font-bold text-brand-primary animate-pulse">
-                          Generating Sitemap...
-                        </p>
-                        <div className="w-full px-20 space-y-3">
-                          <div className="h-3 bg-brand-border rounded-full w-3/4 animate-pulse" />
-                          <div className="h-3 bg-brand-border rounded-full w-full animate-pulse [animation-delay:0.2s]" />
-                          <div className="h-3 bg-brand-border rounded-full w-1/2 animate-pulse [animation-delay:0.4s]" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Marketing Tab */}
-              {activeTab === "marketing" && (
+                {/* Marketing Tab */}
+                {activeTab === "marketing" && (
                 <div className="max-w-4xl mx-auto space-y-6">
                   <div className="flex items-center justify-between">
                     <h2 className="text-3xl font-black text-text-primary">Marketing Strategy</h2>
@@ -609,13 +788,26 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
               {/* Preview Tab */}
               {activeTab === "preview" && (
                 <div className="h-full flex flex-col bg-brand-dark">
-                  {state.generated_code ? (
+                  {isValidHTML ? (
                     <div className="flex-1 bg-white rounded-xl overflow-hidden shadow-2xl border border-brand-border m-4">
                       <iframe
                         srcDoc={state.generated_code}
                         className="w-full h-full border-none"
                         title="Website Preview"
+                        sandbox="allow-scripts allow-same-origin"
                       />
+                    </div>
+                  ) : state.generated_code ? (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center space-y-4 max-w-md">
+                        <div className="w-16 h-16 bg-brand-primary/10 rounded-full flex items-center justify-center mx-auto">
+                          <Monitor className="text-brand-primary animate-pulse" size={32} />
+                        </div>
+                        <h3 className="text-lg font-bold text-text-primary">Code Generation in Progress</h3>
+                        <p className="text-sm text-text-secondary">
+                          The website code is being generated. Please wait...
+                        </p>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center">
@@ -638,9 +830,10 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
                   )}
                 </div>
               )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        )}
       </div>
     </div>
   );

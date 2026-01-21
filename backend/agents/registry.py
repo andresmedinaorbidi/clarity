@@ -146,7 +146,7 @@ class SkillRegistry:
             can_invoke_directly=True,
             suggested_next="ux",
             phase_order=2,
-            requires_approval=True,  # GATE: User must approve the Project Brief
+            requires_approval=False,  # Auto-runs as part of Blueprint creation
             revision_supported=True,
             auto_execute=True,  # Auto-runs after research
             icon="📋",
@@ -214,7 +214,7 @@ class SkillRegistry:
             can_invoke_directly=True,
             suggested_next="prd",
             phase_order=6,
-            requires_approval=True,  # GATE 2: Stop for user approval
+            requires_approval=False,  # Auto-runs after blueprint approval (no gate)
             revision_supported=True,
             auto_execute=True,  # Auto-runs after SEO
             icon="✍️",

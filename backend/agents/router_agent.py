@@ -14,6 +14,8 @@ from state_schema import WebsiteState, AgentReasoning
 from services import mock_hubspot_fetcher
 from agents.registry import get_registry
 from utils_scraper import extract_url_from_text
+from helpers.field_updater import update_state_from_router_updates
+from helpers.chat_response_generator import get_chat_response_data
 
 
 def _execute_skill(state: WebsiteState, skill_id: str, feedback: str = None, registry=None):
@@ -78,6 +80,15 @@ def _execute_skill_chain(state: WebsiteState, start_skill_id: str, registry=None
     Yields:
         Chunks of text from all skills in the chain
     """
+    # #region agent log
+    try:
+        import json
+        from datetime import datetime
+        with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "router_agent.py:_execute_skill_chain", "message": "Chain started", "data": {"start_skill_id": start_skill_id, "current_step": state.current_step}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+    except: pass
+    # #endregion
+    
     if registry is None:
         registry = get_registry()
 
@@ -86,16 +97,55 @@ def _execute_skill_chain(state: WebsiteState, start_skill_id: str, registry=None
     while current_skill_id:
         skill = registry.get(current_skill_id)
         if not skill:
+            # #region agent log
+            try:
+                with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "router_agent.py:_execute_skill_chain", "message": "Skill not found, breaking chain", "data": {"current_skill_id": current_skill_id}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+            except: pass
+            # #endregion
             break
 
+        # #region agent log
+        try:
+            with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "router_agent.py:_execute_skill_chain", "message": "Executing skill", "data": {"skill_id": current_skill_id, "skill_name": skill.name, "requires_approval": skill.requires_approval, "auto_execute": skill.auto_execute, "suggested_next": skill.suggested_next}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+        except: pass
+        # #endregion
+
         # Execute this skill
-        yield from _execute_skill(state, current_skill_id, registry=registry)
+        try:
+            yield from _execute_skill(state, current_skill_id, registry=registry)
+            # #region agent log
+            try:
+                with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "router_agent.py:_execute_skill_chain", "message": "Skill execution completed", "data": {"skill_id": current_skill_id, "has_generated_code": bool(state.generated_code)}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+            except: pass
+            # #endregion
+        except Exception as e:
+            # #region agent log
+            try:
+                import traceback
+                with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "router_agent.py:_execute_skill_chain", "message": "Skill execution error", "data": {"skill_id": current_skill_id, "error": str(e), "traceback": traceback.format_exc()}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+            except: pass
+            # #endregion
+            raise
 
         # Check if this skill requires approval (is a gate)
         if skill.requires_approval:
             print(f"[CHAIN] Paused at gate: {skill.id}")
+            # #region agent log
+            try:
+                with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "router_agent.py:_execute_skill_chain", "message": "Chain paused at gate", "data": {"skill_id": skill.id}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+            except: pass
+            # #endregion
             # Emit gate action marker for frontend approval card
-            gate_name = skill.name.upper().replace(" ", "_")
+            # Map planning skill to BLUEPRINT gate name for UI consistency
+            if skill.id == "planning":
+                gate_name = "BLUEPRINT"
+            else:
+                gate_name = skill.name.upper().replace(" ", "_")
             yield f"\n\n[GATE_ACTION: {gate_name}]\n"
             break
 
@@ -105,10 +155,28 @@ def _execute_skill_chain(state: WebsiteState, start_skill_id: str, registry=None
             next_skill = registry.get(next_skill_id)
             if next_skill and next_skill.auto_execute:
                 print(f"[CHAIN] Auto-continuing to: {next_skill_id}")
+                # #region agent log
+                try:
+                    with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                        f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "router_agent.py:_execute_skill_chain", "message": "Auto-continuing to next skill", "data": {"from": current_skill_id, "to": next_skill_id}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+                except: pass
+                # #endregion
                 current_skill_id = next_skill_id
             else:
+                # #region agent log
+                try:
+                    with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                        f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "router_agent.py:_execute_skill_chain", "message": "Chain stopped - next skill not auto-execute", "data": {"current": current_skill_id, "next": next_skill_id, "next_auto_execute": next_skill.auto_execute if next_skill else None}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+                except: pass
+                # #endregion
                 break
         else:
+            # #region agent log
+            try:
+                with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "router_agent.py:_execute_skill_chain", "message": "Chain stopped - no suggested_next", "data": {"current_skill_id": current_skill_id}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+            except: pass
+            # #endregion
             break
 
 
@@ -156,7 +224,11 @@ def _execute_intent(state: WebsiteState, decision: dict, user_message: str, regi
 
             # Emit gate marker if skill requires approval
             if skill.requires_approval:
-                gate_name = skill.name.upper().replace(" ", "_")
+                # Map planning skill to BLUEPRINT gate name for UI consistency
+                if skill.id == "planning":
+                    gate_name = "BLUEPRINT"
+                else:
+                    gate_name = skill.name.upper().replace(" ", "_")
                 yield f"\n\n[GATE_ACTION: {gate_name}]\n"
 
             # Log the reasoning
@@ -185,7 +257,11 @@ def _execute_intent(state: WebsiteState, decision: dict, user_message: str, regi
 
             # Emit gate marker if skill requires approval
             if skill.requires_approval:
-                gate_name = skill.name.upper().replace(" ", "_")
+                # Map planning skill to BLUEPRINT gate name for UI consistency
+                if skill.id == "planning":
+                    gate_name = "BLUEPRINT"
+                else:
+                    gate_name = skill.name.upper().replace(" ", "_")
                 yield f"\n\n[GATE_ACTION: {gate_name}]\n"
 
             # Log the revision
@@ -203,23 +279,54 @@ def _execute_intent(state: WebsiteState, decision: dict, user_message: str, regi
     # ACTION: PROCEED - Move to next step in the flow
     # -------------------------------------------------------------------------
     elif action == "PROCEED":
+        # #region agent log
+        try:
+            import json
+            from datetime import datetime
+            with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "router_agent.py:_execute_intent", "message": "PROCEED action detected", "data": {"current_step": state.current_step, "user_message": user_message}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+        except: pass
+        # #endregion
+        
         # Special handling for intake phase
         if state.current_step == "intake":
             if state.missing_info:
                 print(f"[INTENT] Cannot proceed from intake: missing {state.missing_info}")
                 state.logs.append("System: Cannot proceed - still missing required information.")
                 return
+            # After intake approval, go to research
+            target_step = "research"
+        elif state.current_step == "research":
+            # After research approval, execute blueprint chain: strategy → ux → planning (stops at planning gate)
+            target_step = "strategy"
+        elif state.current_step == "planning":
+            # After blueprint approval, execute build chain: seo → copywriting → prd → building (all auto)
+            target_step = "seo"
+        else:
+            # Determine the target: either the natural_next_step or derive from current
+            target_step = natural_next_step
+            if not target_step:
+                target_step = registry.get_natural_next_step(state.current_step)
 
-        # Determine the target: either the natural_next_step or derive from current
-        target_step = natural_next_step
-        if not target_step:
-            target_step = registry.get_natural_next_step(state.current_step)
+        # #region agent log
+        try:
+            with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "router_agent.py:_execute_intent", "message": "PROCEED target determined", "data": {"current_step": state.current_step, "target_step": target_step}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+        except: pass
+        # #endregion
 
         if target_step:
             print(f"[INTENT] Proceeding to: {target_step}")
 
             # Execute the skill chain starting from target
             yield from _execute_skill_chain(state, target_step, registry=registry)
+            
+            # #region agent log
+            try:
+                with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "router_agent.py:_execute_intent", "message": "Skill chain execution completed", "data": {"target_step": target_step, "final_step": state.current_step, "has_generated_code": bool(state.generated_code)}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+            except: pass
+            # #endregion
 
             # Log progression
             reasoning = AgentReasoning(
@@ -313,28 +420,8 @@ def run_router_agent(state: WebsiteState, user_message: str):
         # --- PHASE 4: APPLY STATE UPDATES ---
         updates = decision.get("updates", {})
         if updates:
-            FIELD_MAP = {
-                "name": "project_name",
-                "colors": "brand_colors",
-                "style": "design_style"
-            }
-
-            if "inferred_fields" not in state.project_meta:
-                state.project_meta["inferred_fields"] = []
-
-            for key, value in updates.items():
-                if value is None:
-                    continue
-                target_key = FIELD_MAP.get(key.lower(), key)
-                if hasattr(state, target_key) and value:
-                    if target_key == "brand_colors" and isinstance(value, str):
-                        value = [value]
-                    setattr(state, target_key, value)
-                    print(f"[ROUTER] Updated: {target_key} = {value}")
-
-                    if key in assumptions_list or target_key in assumptions_list:
-                        if target_key not in state.project_meta["inferred_fields"]:
-                            state.project_meta["inferred_fields"].append(target_key)
+            # Use the field updater utility to handle updates with proper source tracking
+            update_state_from_router_updates(state, updates, assumptions_list)
 
         # --- PHASE 4.5: URL DETECTION FOR RESEARCH ---
         # Check if user message contains a URL and store it for the Research Agent
@@ -368,37 +455,8 @@ def run_router_agent(state: WebsiteState, user_message: str):
         # --- PHASE 7: GENERATE CHAT RESPONSE ---
         print(f"[ROUTER] Generating chat response...")
 
-        # Define phase-specific response guidance
-        constraints = {
-            "intake": "If missing_info is empty, congratulate them and ask if they're ready to proceed to strategy planning.",
-            "research": "Research is in progress. Mention that you're analyzing their business to provide expert insights.",
-            "strategy": "PROJECT BRIEF GATE: The Project Brief has been created. Tell the user you've analyzed their business and prepared a comprehensive strategy brief based on your research. Ask them to review the brief above and confirm if it aligns with their vision, or let you know if they'd like any changes. This is an important approval step before moving to UX and sitemap planning.",
-            "ux": "Briefly explain user personas and conversion paths were mapped. Ask if they want to proceed to sitemap planning.",
-            "planning": "SITEMAP GATE: The sitemap is ready. Count pages and sections. Ask for approval before continuing to SEO/copy.",
-            "seo": "SEO keywords and meta data are ready. Brief summary.",
-            "copywriting": "MARKETING GATE: Marketing copy is complete. Ask for approval before technical build.",
-            "prd": "Technical PRD is being generated.",
-            "building": "The website is being built. Describe what's happening."
-        }
-
-        response_data = state.model_dump()
-        response_data['user_message'] = user_message
-        response_data['response_strategy'] = constraints.get(state.current_step, "Be helpful and concise.")
-        response_data['prd_length'] = len(state.prd_document)
-        response_data['assumptions'] = ", ".join(state.project_meta.get("assumptions", [])) or "None"
-        
-        # Convert complex objects to safe string representations to avoid format() interpreting braces
-        # When Python's .format() sees {key} in a string, it tries to find a variable named "key"
-        # Converting complex objects to JSON strings prevents this issue
-        if response_data.get('sitemap') and len(response_data['sitemap']) > 0:
-            response_data['sitemap'] = json.dumps(response_data['sitemap'], indent=2)
-        else:
-            response_data['sitemap'] = "No sitemap yet"
-        
-        if response_data.get('missing_info') and len(response_data['missing_info']) > 0:
-            response_data['missing_info'] = ", ".join(str(item) for item in response_data['missing_info'])
-        else:
-            response_data['missing_info'] = "None"
+        # Use the chat response generator utility
+        response_data = get_chat_response_data(state, user_message)
 
         state.logs.append(f"Router: Action={action}, Step={state.current_step}")
 
@@ -432,6 +490,14 @@ def run_router_agent(state: WebsiteState, user_message: str):
         # Send state update to frontend
         state_dict = state.model_dump()
         final_json = json.dumps(state_dict, ensure_ascii=False)
+
+        # #region agent log
+        try:
+            from datetime import datetime
+            with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "router_agent.py:run_router_agent", "message": "Sending state update", "data": {"current_step": state.current_step, "has_generated_code": bool(state.generated_code), "generated_code_length": len(state.generated_code) if state.generated_code else 0, "generated_code_preview": state.generated_code[:100] if state.generated_code else None}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "B"}) + "\n")
+        except: pass
+        # #endregion
 
         yield "\n\n|||STATE_UPDATE|||\n"
         yield final_json

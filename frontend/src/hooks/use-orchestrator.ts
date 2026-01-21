@@ -201,6 +201,12 @@ export function useOrchestrator() {
             const newState = JSON.parse(jsonString);
             const currentStep = newState.current_step || "";
 
+            // #region agent log
+            try {
+              fetch('http://127.0.0.1:7242/ingest/5287e8c5-0195-4543-9990-256e4c752e04',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-orchestrator.ts:STATE_UPDATE',message:'State update received',data:{current_step:currentStep,has_generated_code:!!newState.generated_code,generated_code_length:newState.generated_code?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            } catch {}
+            // #endregion
+
             // Generate clean confirmation message
             let assistantFinalText = "";
             if (currentStep === "planning" || newState.sitemap?.length > 0) {
@@ -222,15 +228,25 @@ export function useOrchestrator() {
               assistantFinalText = cleanedText || "Processing complete!";
             }
 
-            setState((prev) => ({
-              ...prev,
-              ...newState,
-              prd_document: cleanMarkdown(newState.prd_document || prev.prd_document),
-              chat_history: [
-                ...prev.chat_history.slice(0, -1),
-                { role: "assistant", content: assistantFinalText },
-              ],
-            }));
+            setState((prev) => {
+              const updated = {
+                ...prev,
+                ...newState,
+                prd_document: cleanMarkdown(newState.prd_document || prev.prd_document),
+                chat_history: [
+                  ...prev.chat_history.slice(0, -1),
+                  { role: "assistant", content: assistantFinalText },
+                ],
+              };
+              
+              // #region agent log
+              try {
+                fetch('http://127.0.0.1:7242/ingest/5287e8c5-0195-4543-9990-256e4c752e04',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-orchestrator.ts:setState',message:'State updated',data:{current_step:updated.current_step,has_generated_code:!!updated.generated_code,generated_code_length:updated.generated_code?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+              } catch {}
+              // #endregion
+              
+              return updated;
+            });
 
             // Reset artifact mode
             isInArtifactMode = false;

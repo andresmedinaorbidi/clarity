@@ -4,6 +4,8 @@ FastAPI backend with session-based persistence and multi-tenancy support.
 Each user session gets its own isolated WebsiteState stored in SQLite.
 """
 
+import json
+
 from fastapi import FastAPI, Body, Header, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse

@@ -16,8 +16,11 @@ RULES:
 4. Look at CRM Data: {crm_data}. If the info is there, it counts as NOT missing.
 5. IMPORTANT: If a field has been filled by the Router Agent (even as an assumption/inference), it is NOT missing.
 6. Only mark a field as missing if it is genuinely empty ("", [], or null) AND we cannot proceed without it.
+7. CRITICAL: Do NOT mark fields in {inferred_fields} as missing, even if they seem incomplete. These were AI-inferred and are acceptable.
+8. CRITICAL: Return ALL missing fields in ONE list. Do NOT return them one at a time.
 
 YOUR TASK:
 Return a JSON list of field names that are EMPTY or NULL.
 If all 4 fields are present (either user-provided OR inferred by Router), return [].
 Accept both explicit user input and intelligent Router inferences as valid data.
+IMPORTANT: Return ALL missing fields in a single list, not one at a time.

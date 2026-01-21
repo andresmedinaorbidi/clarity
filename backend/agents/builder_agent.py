@@ -4,6 +4,14 @@ from utils import get_filled_prompt, stream_gemini, log_agent_action
 from state_schema import WebsiteState, AgentReasoning
 
 def run_builder_agent(state: WebsiteState, feedback: str = None):
+    # #region agent log
+    try:
+        from datetime import datetime
+        with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "builder_agent.py:run_builder_agent", "message": "Builder agent started", "data": {"has_feedback": bool(feedback), "has_prd": bool(state.prd_document), "has_seo": bool(state.seo_data), "has_copy": bool(state.copywriting)}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+    except: pass
+    # #endregion
+    
     # 1. Determine instruction
     if feedback:
         instruction = f"Update the existing website code based on this feedback: '{feedback}'."
@@ -24,27 +32,113 @@ def run_builder_agent(state: WebsiteState, feedback: str = None):
 
     # 4. Load External Prompt
     filled_prompt = get_filled_prompt("builder_agent", state_dict)
+    
+    # #region agent log
+    try:
+        with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "builder_agent.py:run_builder_agent", "message": "Starting Gemini stream", "data": {"prompt_length": len(filled_prompt), "prompt_preview": filled_prompt[:200] if len(filled_prompt) > 200 else filled_prompt}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+    except: pass
+    # #endregion
 
     # 5. START THE STREAM
     yield "🚀 **Compiling code and rendering preview...** \n\n"
     
     full_code = ""
-    for chunk in stream_gemini(filled_prompt, json_mode=False, model_type="pro"):
-        full_code += chunk
-        # Note: We don't usually stream the raw code to the CHAT bubble 
-        # (it looks messy), but we yield it so the Router can catch it.
-        yield "" 
+    chunk_count = 0
+    try:
+        for chunk in stream_gemini(filled_prompt, json_mode=False, model_type="pro"):
+            full_code += chunk
+            chunk_count += 1
+            # Note: We don't usually stream the raw code to the CHAT bubble 
+            # (it looks messy), but we yield it so the Router can catch it.
+            yield "" 
+        
+        # #region agent log
+        try:
+            with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "builder_agent.py:run_builder_agent", "message": "Gemini stream completed", "data": {"chunk_count": chunk_count, "code_length": len(full_code)}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+        except: pass
+        # #endregion
+    except Exception as e:
+        # #region agent log
+        try:
+            import traceback
+            with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "builder_agent.py:run_builder_agent", "message": "Gemini stream error", "data": {"error": str(e), "traceback": traceback.format_exc()}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+        except: pass
+        # #endregion
+        raise
 
     # 6. Clean and Save
-    # We use the same 'Triple-Strip' logic to remove ```html tags
+    # #region agent log
+    try:
+        with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "builder_agent.py:run_builder_agent", "message": "Raw code before cleaning", "data": {"full_code_length": len(full_code), "full_code_preview": full_code[:500]}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "C"}) + "\n")
+    except: pass
+    # #endregion
+    
+    # We use improved logic to extract HTML code
     clean_code = full_code.strip()
+    
+    # Priority 1: Look for ```html code blocks first
     if "```html" in clean_code:
-        clean_code = clean_code.split("```html")[1].split("```")[0].strip()
+        parts = clean_code.split("```html")
+        if len(parts) > 1:
+            clean_code = parts[1].split("```")[0].strip()
+    # Priority 2: Look for HTML starting with <!DOCTYPE or <html
+    elif clean_code.strip().startswith("<!DOCTYPE") or clean_code.strip().startswith("<html"):
+        # Already raw HTML, just clean whitespace
+        clean_code = clean_code.strip()
+    # Priority 3: Look for any code block and check if it's HTML
     elif "```" in clean_code:
-        clean_code = clean_code.split("```")[1].split("```")[0].strip()
+        # Find all code blocks
+        import re
+        code_blocks = re.findall(r'```(?:html)?\s*\n(.*?)```', clean_code, re.DOTALL)
+        # Prefer HTML-looking blocks
+        html_block = None
+        for block in code_blocks:
+            block_stripped = block.strip()
+            if block_stripped.startswith("<!DOCTYPE") or block_stripped.startswith("<html") or "<div" in block_stripped or "<body" in block_stripped:
+                html_block = block_stripped
+                break
+        if html_block:
+            clean_code = html_block
+        else:
+            # Fallback: use first code block
+            clean_code = clean_code.split("```")[1].split("```")[0].strip()
+    
+    # Final validation: ensure it looks like HTML
+    if not (clean_code.startswith("<!DOCTYPE") or clean_code.startswith("<html") or "<div" in clean_code or "<body" in clean_code):
+        # #region agent log
+        try:
+            with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+                f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "builder_agent.py:run_builder_agent", "message": "WARNING: Cleaned code doesn't look like HTML", "data": {"clean_code_preview": clean_code[:200]}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "C"}) + "\n")
+        except: pass
+        # #endregion
+        # If it doesn't look like HTML, try to find HTML in the original
+        if "<!DOCTYPE" in full_code:
+            clean_code = full_code.split("<!DOCTYPE")[1]
+            if "</html>" in clean_code:
+                clean_code = "<!DOCTYPE" + clean_code.split("</html>")[0] + "</html>"
+            else:
+                clean_code = "<!DOCTYPE" + clean_code
+        elif "<html" in full_code:
+            html_start = full_code.find("<html")
+            html_end = full_code.rfind("</html>")
+            if html_end > html_start:
+                clean_code = full_code[html_start:html_end + 7]
+            else:
+                clean_code = full_code[html_start:]
 
     state.generated_code = clean_code
     state.logs.append("Builder Agent: Website code generated.")
+    
+    # #region agent log
+    try:
+        with open(r"c:\Users\Administrador\Desktop\clarity by plinng\.cursor\debug.log", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"timestamp": datetime.now().isoformat(), "location": "builder_agent.py:run_builder_agent", "message": "Code saved to state", "data": {"clean_code_length": len(clean_code), "has_code": bool(clean_code)}, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+    except: pass
+    # #endregion
 
     # 7. CAPTURE REASONING
     # Summarize what data sources the builder used
