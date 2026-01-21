@@ -238,7 +238,8 @@ async def chat(
 
         for chunk in run_router_agent(state, user_text):
             # Check for state update marker
-            if "|||STATE_UPDATE|||" in chunk:
+            from constants import STATE_UPDATE_MARKER
+            if STATE_UPDATE_MARKER in chunk:
                 # The next chunk will be the state JSON
                 yield chunk
             elif chunk.startswith("{") and '"project_name"' in chunk:

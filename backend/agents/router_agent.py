@@ -16,6 +16,8 @@ from agents.registry import get_registry
 from utils_scraper import extract_url_from_text
 from helpers.field_updater import update_state_from_router_updates
 from helpers.chat_response_generator import get_chat_response_data
+from helpers.step_transitions import get_next_step, can_proceed_from_step
+from constants import StepName, STATE_UPDATE_MARKER, get_gate_name_for_step, GATE_ACTION_PATTERN
 
 
 def _execute_skill(state: WebsiteState, skill_id: str, feedback: str = None, registry=None):
@@ -141,11 +143,7 @@ def _execute_skill_chain(state: WebsiteState, start_skill_id: str, registry=None
             except: pass
             # #endregion
             # Emit gate action marker for frontend approval card
-            # Map planning skill to BLUEPRINT gate name for UI consistency
-            if skill.id == "planning":
-                gate_name = "BLUEPRINT"
-            else:
-                gate_name = skill.name.upper().replace(" ", "_")
+            gate_name = get_gate_name_for_step(skill.id, skill.name)
             yield f"\n\n[GATE_ACTION: {gate_name}]\n"
             break
 
@@ -224,11 +222,7 @@ def _execute_intent(state: WebsiteState, decision: dict, user_message: str, regi
 
             # Emit gate marker if skill requires approval
             if skill.requires_approval:
-                # Map planning skill to BLUEPRINT gate name for UI consistency
-                if skill.id == "planning":
-                    gate_name = "BLUEPRINT"
-                else:
-                    gate_name = skill.name.upper().replace(" ", "_")
+                gate_name = get_gate_name_for_step(skill.id, skill.name)
                 yield f"\n\n[GATE_ACTION: {gate_name}]\n"
 
             # Log the reasoning
@@ -257,11 +251,7 @@ def _execute_intent(state: WebsiteState, decision: dict, user_message: str, regi
 
             # Emit gate marker if skill requires approval
             if skill.requires_approval:
-                # Map planning skill to BLUEPRINT gate name for UI consistency
-                if skill.id == "planning":
-                    gate_name = "BLUEPRINT"
-                else:
-                    gate_name = skill.name.upper().replace(" ", "_")
+                gate_name = get_gate_name_for_step(skill.id, skill.name)
                 yield f"\n\n[GATE_ACTION: {gate_name}]\n"
 
             # Log the revision
@@ -288,25 +278,19 @@ def _execute_intent(state: WebsiteState, decision: dict, user_message: str, regi
         except: pass
         # #endregion
         
-        # Special handling for intake phase
-        if state.current_step == "intake":
-            if state.missing_info:
-                print(f"[INTENT] Cannot proceed from intake: missing {state.missing_info}")
-                state.logs.append("System: Cannot proceed - still missing required information.")
-                return
-            # After intake approval, go to research
-            target_step = "research"
-        elif state.current_step == "research":
-            # After research approval, execute blueprint chain: strategy → ux → planning (stops at planning gate)
-            target_step = "strategy"
-        elif state.current_step == "planning":
-            # After blueprint approval, execute build chain: seo → copywriting → prd → building (all auto)
-            target_step = "seo"
-        else:
-            # Determine the target: either the natural_next_step or derive from current
-            target_step = natural_next_step
-            if not target_step:
-                target_step = registry.get_natural_next_step(state.current_step)
+        # Check if we can proceed from current step
+        if not can_proceed_from_step(state.current_step, state):
+            print(f"[INTENT] Cannot proceed from {state.current_step}: missing required information")
+            state.logs.append("System: Cannot proceed - still missing required information.")
+            return
+        
+        # Determine next step using transition utility
+        target_step = get_next_step(
+            current_step=state.current_step,
+            action=action,
+            registry=registry,
+            natural_next_step=natural_next_step
+        )
 
         # #region agent log
         try:
@@ -437,7 +421,7 @@ def run_router_agent(state: WebsiteState, user_message: str):
             crm_result = mock_hubspot_fetcher(state.project_name)
             state.crm_data = crm_result if crm_result is not None else {}
 
-        if state.current_step == "intake":
+        if state.current_step == StepName.INTAKE.value:
             from agents.intake_agent import run_intake_agent
             state = run_intake_agent(state)
 
@@ -471,8 +455,9 @@ def run_router_agent(state: WebsiteState, user_message: str):
         state.chat_history.append({"role": "assistant", "content": full_response})
 
         # Emit gate action for intake approval if intake is complete and no missing info
-        if state.current_step == "intake" and not state.missing_info:
-            yield "\n\n[GATE_ACTION: INTAKE_&_AUDIT]\n"
+        if state.current_step == StepName.INTAKE.value and not state.missing_info:
+            gate_name = get_gate_name_for_step(StepName.INTAKE.value, "Intake & Audit")
+            yield f"\n\n[GATE_ACTION: {gate_name}]\n"
 
         # Memory compression (every 5 turns)
         chat_turn_count = len(state.chat_history) // 2
@@ -499,7 +484,7 @@ def run_router_agent(state: WebsiteState, user_message: str):
         except: pass
         # #endregion
 
-        yield "\n\n|||STATE_UPDATE|||\n"
+        yield f"\n\n{STATE_UPDATE_MARKER}\n"
         yield final_json
 
         print(f"[ROUTER] Completed successfully.")

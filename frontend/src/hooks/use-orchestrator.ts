@@ -8,6 +8,7 @@ import {
   resetSession,
   SessionError,
 } from "@/lib/api";
+import { STATE_UPDATE_MARKER, GATE_ACTION_PATTERN } from "@/lib/constants";
 
 export interface Message {
   role: "user" | "assistant";
@@ -192,9 +193,9 @@ export function useOrchestrator() {
         const chunk = decoder.decode(value, { stream: true });
         fullStreamContent += chunk;
 
-        // ===== STATE UPDATE DETECTION (Priority) =====
-        if (fullStreamContent.includes("|||STATE_UPDATE|||")) {
-          const parts = fullStreamContent.split("|||STATE_UPDATE|||");
+                // ===== STATE UPDATE DETECTION (Priority) =====
+                if (fullStreamContent.includes(STATE_UPDATE_MARKER)) {
+                  const parts = fullStreamContent.split(STATE_UPDATE_MARKER);
           const jsonString = parts[1].trim();
 
           try {

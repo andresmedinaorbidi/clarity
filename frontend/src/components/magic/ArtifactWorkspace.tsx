@@ -27,6 +27,15 @@ import VisualBrief from "./VisualBrief";
 import VisualSitemap from "./VisualSitemap";
 import ResearchScreen from "./ResearchScreen";
 import BlueprintScreen from "./BlueprintScreen";
+import {
+  getActiveScreen,
+  shouldShowResearchScreen,
+  shouldShowBlueprintScreen,
+  shouldShowPreviewScreen,
+  isValidHTML,
+} from "@/lib/screenUtils";
+import { detectArtifactChanges } from "@/lib/stateChangeDetector";
+import { ScreenTab, ArtifactTab } from "@/lib/constants";
 
 interface ArtifactWorkspaceProps {
   state: WebsiteState;
@@ -34,8 +43,6 @@ interface ArtifactWorkspaceProps {
   onSend?: (message: string) => void;
 }
 
-type ArtifactTab = "brief" | "sitemap" | "marketing" | "preview" | "prd";
-type ScreenTab = "research" | "blueprint" | "preview";
 
 export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWorkspaceProps) {
   const { isAdvancedMode } = useAdvancedMode();
@@ -46,55 +53,10 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
 
   // Track state changes and set notifications
   useEffect(() => {
-    if (!prevStateRef.current) {
-      prevStateRef.current = state;
-      return;
-    }
-
-    const prev = prevStateRef.current;
-    const newNotifications = new Set<ArtifactTab>();
-
-    // Check for changes in each artifact
-    if (state.project_brief !== prev.project_brief && state.project_brief) {
-      newNotifications.add("brief");
-    }
-
-    if (
-      JSON.stringify(state.sitemap) !== JSON.stringify(prev.sitemap) &&
-      state.sitemap &&
-      state.sitemap.length > 0
-    ) {
-      newNotifications.add("sitemap");
-    }
-
-    if (
-      JSON.stringify(state.seo_data) !== JSON.stringify(prev.seo_data) ||
-      JSON.stringify(state.copywriting) !== JSON.stringify(prev.copywriting)
-    ) {
-      if (state.seo_data || state.copywriting) {
-        newNotifications.add("marketing");
-      }
-    }
-
-    if (
-      state.generated_code !== prev.generated_code &&
-      state.generated_code &&
-      state.generated_code.length > 0
-    ) {
-      newNotifications.add("preview");
-    }
-
-    if (
-      state.prd_document !== prev.prd_document &&
-      state.prd_document &&
-      state.prd_document.length > 0
-    ) {
-      newNotifications.add("prd");
-    }
-
-    // Merge with existing notifications
-    if (newNotifications.size > 0) {
-      setNotifications((prev) => new Set([...prev, ...newNotifications]));
+    const changes = detectArtifactChanges(prevStateRef.current, state);
+    
+    if (changes.size > 0) {
+      setNotifications((prev) => new Set([...prev, ...changes]));
     }
 
     prevStateRef.current = state;
@@ -226,34 +188,16 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
   }, [isAdvancedMode]);
 
   // Determine which screen to show based on current_step (mapped to 3-screen UI)
-  // Screen 1 (Research): intake, research
-  const showResearchScreen = state.current_step === "intake" || state.current_step === "research";
-  // Screen 2 (Blueprint): strategy, ux, planning (all part of blueprint creation)
-  const showBlueprintScreen = state.current_step === "strategy" || state.current_step === "ux" || state.current_step === "planning" || (state.project_brief || state.sitemap?.length > 0);
-  // Screen 3 (Preview): seo, copywriting, prd, building (all behind the scenes, then preview)
-  const showPreviewScreen = state.current_step === "seo" || state.current_step === "copywriting" || state.current_step === "prd" || state.current_step === "building" || (state.generated_code && state.generated_code.length > 0);
-  
-  // Check if generated_code is valid HTML (not Python code or error)
-  const isValidHTML = state.generated_code && 
-    state.generated_code.length > 0 && 
-    !state.generated_code.includes("python") &&
-    !state.generated_code.includes("path =") &&
-    !state.generated_code.includes(".txt") &&
-    (state.generated_code.trim().startsWith("<!") || 
-     state.generated_code.trim().startsWith("<html") ||
-     state.generated_code.includes("<div") ||
-     state.generated_code.includes("<body"));
+  const showResearchScreen = shouldShowResearchScreen(state);
+  const showBlueprintScreen = shouldShowBlueprintScreen(state);
+  const showPreviewScreen = shouldShowPreviewScreen(state);
+  const isGeneratedCodeValid = isValidHTML(state.generated_code);
   
   // Auto-switch to appropriate screen based on state
   useEffect(() => {
-    if (showResearchScreen) {
-      setActiveScreen("research");
-    } else if (showBlueprintScreen) {
-      setActiveScreen("blueprint");
-    } else if (showPreviewScreen) {
-      setActiveScreen("preview");
-    }
-  }, [showResearchScreen, showBlueprintScreen, showPreviewScreen]);
+    const active = getActiveScreen(state);
+    setActiveScreen(active);
+  }, [state.current_step, state.project_brief, state.sitemap, state.generated_code]);
   
   // For Advanced Mode, still show tabs for technical details
   const showAdvancedTabs = isAdvancedMode && (state.seo_data || state.copywriting || state.prd_document);
@@ -426,7 +370,7 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
               transition={{ duration: 0.4 }}
               className="h-full p-8"
             >
-              {isValidHTML ? (
+              {isGeneratedCodeValid ? (
                 <div className="max-w-6xl mx-auto space-y-6">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xs font-medium uppercase tracking-widest text-text-primary">Build Preview</h2>
@@ -788,7 +732,7 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
               {/* Preview Tab */}
               {activeTab === "preview" && (
                 <div className="h-full flex flex-col bg-brand-dark">
-                  {isValidHTML ? (
+                  {isGeneratedCodeValid ? (
                     <div className="flex-1 bg-white rounded-xl overflow-hidden shadow-2xl border border-brand-border m-4">
                       <iframe
                         srcDoc={state.generated_code}

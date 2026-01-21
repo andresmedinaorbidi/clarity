@@ -5,6 +5,7 @@ import { Send, Sparkles } from "lucide-react";
 import SmoothText from "./SmoothText";
 import ApprovalCard from "./ApprovalCard";
 import { useAdvancedMode } from "@/contexts/AdvancedModeContext";
+import { GATE_ACTION_PATTERN } from "@/lib/constants";
 
 interface Message {
   role: "user" | "assistant";
@@ -20,7 +21,7 @@ interface ChatInterfaceProps {
 
 // Parse gate action from message content
 function parseGateAction(content: string): string | null {
-  const gateMatch = content.match(/\[GATE_ACTION:\s*([^\]]+)\]/);
+  const gateMatch = content.match(GATE_ACTION_PATTERN);
   return gateMatch ? gateMatch[1].trim() : null;
 }
 
@@ -57,7 +58,7 @@ function sanitizeText(text: string): string {
 
 // Remove gate markers and sanitize content
 function cleanMessageContent(content: string): string {
-  let cleaned = content.replace(/\[GATE_ACTION:\s*[^\]]+\]/g, "").trim();
+  let cleaned = content.replace(GATE_ACTION_PATTERN, "").trim();
   
   // Only sanitize if not in Advanced Mode (to preserve technical details for power users)
   // But always remove obvious JSON leaks
