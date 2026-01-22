@@ -184,3 +184,33 @@ export async function createNewSession(): Promise<{ session_id: string }> {
 
   return data;
 }
+
+/**
+ * Get all available sessions from the database.
+ */
+export async function getAllSessions(): Promise<{
+  sessions: Array<{
+    session_id: string;
+    created_at: string | null;
+    updated_at: string | null;
+    project_name: string;
+    current_step: string;
+  }>;
+  count: number;
+}> {
+  const response = await fetch(`${API_URL}/sessions`, {
+    headers: { "Content-Type": "application/json" },
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Switch to a specific session by ID.
+ * This updates localStorage and returns the session ID.
+ */
+export function switchToSession(sessionId: string): void {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+    console.log("[Session] Switched to session:", sessionId);
+  }
+}

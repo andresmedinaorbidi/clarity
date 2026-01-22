@@ -7,6 +7,8 @@ import {
   getSessionId,
   resetSession,
   SessionError,
+  switchToSession,
+  getAllSessions,
 } from "@/lib/api";
 import { STATE_UPDATE_MARKER, GATE_ACTION_PATTERN } from "@/lib/constants";
 
@@ -335,6 +337,51 @@ export function useOrchestrator() {
     setError(null);
   }, []);
 
+  /**
+   * Load a specific session by ID.
+   * Switches to the session and fetches its state.
+   */
+  const loadSession = useCallback(async (targetSessionId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Switch to the target session
+      switchToSession(targetSessionId);
+      setSessionId(targetSessionId);
+
+      // Fetch state for the new session
+      const backendState = await getProjectState();
+      console.log("[Orchestrator] Loaded session:", targetSessionId, backendState.current_step);
+
+      // Update state with the loaded session data
+      setState((prev) => ({
+        ...DEFAULT_STATE,
+        ...backendState,
+        prd_document: cleanMarkdown(backendState.prd_document || ""),
+      }));
+    } catch (err) {
+      console.error("[Orchestrator] Failed to load session:", err);
+      setError("Failed to load session. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Get list of all available sessions.
+   */
+  const listAllSessions = useCallback(async () => {
+    try {
+      const data = await getAllSessions();
+      return data.sessions;
+    } catch (err) {
+      console.error("[Orchestrator] Failed to list sessions:", err);
+      setError("Failed to load sessions list.");
+      return [];
+    }
+  }, []);
+
   return {
     state,
     loading,
@@ -345,5 +392,7 @@ export function useOrchestrator() {
     startNewProject,
     refreshState,
     clearError,
+    loadSession,
+    listAllSessions,
   };
 }

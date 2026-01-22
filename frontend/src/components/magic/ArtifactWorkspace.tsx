@@ -22,6 +22,7 @@ import {
 import { WebsiteState } from "@/hooks/use-orchestrator";
 import { useAdvancedMode } from "@/contexts/AdvancedModeContext";
 import AdvancedModeToggle from "./AdvancedModeToggle";
+import SessionSelector from "./SessionSelector";
 import IntakeCard from "./IntakeCard";
 import VisualBrief from "./VisualBrief";
 import VisualSitemap from "./VisualSitemap";
@@ -329,8 +330,11 @@ export default function ArtifactWorkspace({ state, loading, onSend }: ArtifactWo
             </>
           )}
         </div>
-        {/* Advanced Mode Toggle - Always visible */}
-        <AdvancedModeToggle />
+        {/* Right side controls: Session Selector and Advanced Mode Toggle */}
+        <div className="flex items-center gap-2">
+          <SessionSelector />
+          <AdvancedModeToggle />
+        </div>
       </div>
 
       {/* Artifact Content Area */}
