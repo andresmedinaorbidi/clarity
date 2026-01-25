@@ -31,6 +31,28 @@ export interface SitemapPage {
   sections: string[];
 }
 
+/**
+ * PR-02: Represents a machine-inferred field value with metadata.
+ * Used in project_meta.inferred to track LLM/scraper suggestions.
+ */
+export interface InferredField {
+  value: unknown;
+  confidence?: number;  // 0.0-1.0 (0=low, 1=high)
+  source?: string;      // "llm", "scraped", "hybrid", "default"
+  rationale?: string;   // Short explanation of inference
+}
+
+/**
+ * PR-02: Structured project metadata supporting inferred values and user overrides.
+ * Extends Record<string, unknown> to allow arbitrary additional keys for backward compatibility.
+ */
+export type ProjectMeta = Record<string, unknown> & {
+  /** Machine-inferred values with confidence/source/rationale metadata */
+  inferred?: Record<string, InferredField>;
+  /** Explicit user-provided values that override inferred values */
+  user_overrides?: Record<string, unknown>;
+};
+
 export interface WebsiteState {
   project_name: string;
   industry: string;
@@ -44,7 +66,8 @@ export interface WebsiteState {
   prd_document: string;
   generated_code: string;
   chat_history: Message[];
-  project_meta: Record<string, unknown>;
+  /** PR-02: Now typed with explicit inferred/user_overrides structure */
+  project_meta: ProjectMeta;
   agent_reasoning: AgentReasoning[];
   seo_data?: Record<string, unknown> | null;
   ux_strategy?: Record<string, unknown> | null;

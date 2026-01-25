@@ -30,7 +30,11 @@ const DEFAULT_STATE: WebsiteState = {
   prd_document: "",
   generated_code: "",
   chat_history: [],
-  project_meta: {},
+  // PR-02: Initialize project_meta with inferred/user_overrides structure
+  project_meta: {
+    inferred: {},
+    user_overrides: {},
+  },
   agent_reasoning: [],
   seo_data: null,
   ux_strategy: null,

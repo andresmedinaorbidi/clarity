@@ -141,9 +141,19 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 * `generated_code` (final HTML/Tailwind CSS)
 * `current_step` (workflow step: intake, research, strategy, ux, planning, seo, copywriting, prd, building)
 * `chat_history` (conversation log)
-* `project_meta`, `seo_data`, `ux_strategy`, `copywriting` (specialist outputs)
+* `project_meta` (PR-02: structured metadata - see below), `seo_data`, `ux_strategy`, `copywriting` (specialist outputs)
 * `agent_reasoning` (transparency: agent thoughts and certainty)
 * `context_summary` (compressed project history)
+
+**InferredField** (backend/state_schema.py, PR-02):
+* `value` (Any - the inferred value)
+* `confidence` (float 0.0-1.0 - confidence score)
+* `source` (string - "llm", "scraped", "hybrid", "default")
+* `rationale` (string - short explanation of inference)
+
+**project_meta Structure** (PR-02):
+* `project_meta["inferred"]`: Dict of field_name → InferredField-like objects (machine-suggested values)
+* `project_meta["user_overrides"]`: Dict of field_name → user-provided values (always takes precedence)
 
 **Skill** (backend/agents/registry.py):
 * `id`, `name`, `description`
@@ -280,6 +290,7 @@ intake → research → strategy → ux → planning → seo → copywriting →
 * `chat_history` is always a list of `{role, content}` dicts
 * State updates are atomic per session (SQLite transactions)
 * Memory compression preserves essential context in `context_summary`
+* `project_meta` always contains `inferred` and `user_overrides` keys (PR-02)
 
 ---
 
@@ -466,6 +477,6 @@ intake → research → strategy → ux → planning → seo → copywriting →
 ## 13. Last Updated
 
 * **Date**: 2026-01-25
-* **Author**: PR-01 Implementation
-* **Change Context**: PR-01 - Backend is the sole authority for steps & state. Removed frontend logic in `use-orchestrator.ts` that mutated `current_step` based on artifact detection heuristics. Frontend now only updates `WebsiteState` via backend state updates through `|||STATE_UPDATE|||` marker.
-* **Version**: 1.1.0
+* **Author**: PR-02 Implementation
+* **Change Context**: PR-02 - Added schema support for inferred fields and user overrides. New `InferredField` Pydantic model in backend. `project_meta` now defaults to `{inferred: {}, user_overrides: {}}` structure in both backend and frontend. Fixed mutable default arguments in state_schema.py using `Field(default_factory=...)`. TypeScript types updated with `InferredField` and `ProjectMeta` interfaces.
+* **Version**: 1.2.0
