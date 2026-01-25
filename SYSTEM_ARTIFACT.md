@@ -90,6 +90,13 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
     │   │   ├── ArtifactWorkspace.tsx # Artifact tabs (Sitemap, PRD, Marketing)
     │   │   ├── BuilderSection.tsx   # Website preview (iframe)
     │   │   └── AgentTrace.tsx       # Agent reasoning visualization
+    │   ├── components/intake/  # Guided intake flow components
+    │   │   ├── GuidedIntakeView.tsx # Main intake container (data priority logic)
+    │   │   ├── ChipPicker.tsx       # Selectable chip options (industry, etc.)
+    │   │   ├── ColorPicker.tsx      # Brand color selection with presets
+    │   │   ├── FontPicker.tsx       # Typography style selection
+    │   │   ├── StyleCard.tsx        # Visual design style cards
+    │   │   └── index.ts             # Barrel exports
     │   ├── hooks/
     │   │   └── use-orchestrator.ts  # State management & streaming API client
     │   ├── contexts/
@@ -107,6 +114,7 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 * **backend/prompts/**: Agent instruction templates (loaded dynamically)
 * **backend/helpers/**: Modular utilities for chat, state updates, transitions
 * **frontend/src/components/magic/**: Specialized UI components for each phase
+* **frontend/src/components/intake/**: Guided intake picker components (chips, colors, fonts, styles)
 * **frontend/src/hooks/**: State management and API communication
 
 ---
@@ -529,5 +537,5 @@ intake → research → strategy → ux → planning → seo → copywriting →
 
 * **Date**: 2026-01-25
 * **Author**: System Artifact Update
-* **Change Context**: Introduced `FlowShell.tsx` as the main workspace shell component (replaces WorkspaceView in page.tsx flow); FlowShell manages post-hero split-view layout with chat (left) and artifact workspace (right); WorkspaceView marked as deprecated
-* **Version**: 1.6.0
+* **Change Context**: Added guided intake components in `frontend/src/components/intake/`: GuidedIntakeView (main container with data priority: user_overrides > inferred > empty), ChipPicker (industry selection), ColorPicker (brand colors with presets), FontPicker (typography), StyleCard (design styles); all pickers call updateProject() on change and display AI badge for inferred values
+* **Version**: 1.7.0
