@@ -447,17 +447,45 @@ async def enrich_project(
     """
     Enrich project metadata with inferred fields from scraping and LLM analysis.
 
+    Parameters:
+    - url: Optional URL to scrape (falls back to state.additional_context.business_url)
+    - force: If true, re-runs enrichment even if inferred fields exist (default: false)
+
+    Behavior:
     - Runs scraping with ~2s timeout (if URL available)
     - Runs LLM enrichment with ~4s timeout
     - Merges inferred fields following rules:
-      - Never overwrites user_overrides
+      - Never overwrites user_overrides (even with force=true)
       - Only upgrades inferred values if confidence increases
+      - Stores source + confidence per inferred field
     - Saves and returns updated state
+
+    Without force=true, skips enrichment if project_meta.inferred already has fields.
     """
     sid = get_session_id(x_session_id, session_id)
     state = get_state(sid)
 
-    print(f"[ENRICH] Starting enrichment for session: {sid}")
+    # Check force parameter
+    force = data.get("force", False)
+    if isinstance(force, str):
+        force = force.lower() in ("true", "1", "yes")
+
+    print(f"[ENRICH] Starting enrichment for session: {sid}, force={force}")
+
+    # Check if already enriched (skip unless force=true)
+    has_existing_inferred = bool(state.project_meta.inferred)
+    if has_existing_inferred and not force:
+        state.logs.append("Enrich: Skipped - already has inferred fields (use force=true to re-run)")
+        print(f"[ENRICH] Skipped - already has {len(state.project_meta.inferred)} inferred fields")
+        response = state.model_dump()
+        response["_session_id"] = sid
+        response["_enrichment_skipped"] = True
+        response["_existing_inferred_count"] = len(state.project_meta.inferred)
+        return response
+
+    if has_existing_inferred and force:
+        state.logs.append(f"Enrich: Force re-run with {len(state.project_meta.inferred)} existing inferred fields")
+        print(f"[ENRICH] Force re-run - will merge with {len(state.project_meta.inferred)} existing fields")
 
     # Determine URL to scrape (from request body or state)
     url = data.get("url") or state.additional_context.get("business_url")
@@ -502,14 +530,24 @@ async def enrich_project(
         )
 
         if llm_inferences:
+            # Include force flag in source for traceability
             source = f"enrich_agent:{scrape_source}"
+            if force:
+                source += ":forced"
+
+            # Track what was updated vs skipped
+            before_count = len(state.project_meta.inferred)
             state.project_meta = _merge_inferred_fields(
                 state.project_meta,
                 llm_inferences,
                 source
             )
-            state.logs.append(f"Enrich: Inferred {len(llm_inferences)} fields")
-            print(f"[ENRICH] Inferred {len(llm_inferences)} fields")
+            after_count = len(state.project_meta.inferred)
+            new_fields = after_count - before_count
+            upgraded_fields = len(llm_inferences) - new_fields  # Fields that might have been upgraded
+
+            state.logs.append(f"Enrich: Processed {len(llm_inferences)} fields ({new_fields} new, {upgraded_fields} checked for upgrade)")
+            print(f"[ENRICH] Processed {len(llm_inferences)} fields ({new_fields} new)")
 
     except asyncio.TimeoutError:
         state.logs.append("Enrich: LLM enrichment timed out")
@@ -524,4 +562,8 @@ async def enrich_project(
 
     response = state.model_dump()
     response["_session_id"] = sid
+    response["_enrichment_completed"] = True
+    response["_force_used"] = force
+    response["_inferred_count"] = len(state.project_meta.inferred)
+    response["_user_overrides_count"] = len(state.project_meta.user_overrides)
     return response

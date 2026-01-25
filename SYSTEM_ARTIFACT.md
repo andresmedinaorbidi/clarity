@@ -253,12 +253,27 @@ Behavior:
 
 **Enrichment Protocol** (POST /enrich):
 ```
-Request: { "url": "optional URL to scrape" }
-Response: Complete WebsiteState JSON with updated project_meta.inferred
+Request: {
+  "url": "optional URL to scrape",
+  "force": true  // re-run even if inferred fields exist (default: false)
+}
+Response: WebsiteState JSON with metadata:
+  - _enrichment_completed: true/false
+  - _enrichment_skipped: true (if skipped without force)
+  - _force_used: true/false
+  - _inferred_count: number of inferred fields
+  - _user_overrides_count: number of user overrides
+
 Timeouts: Scrape ~2s, LLM ~4s
-Merge Rules:
+
+Behavior:
+  - Without force: Skips if project_meta.inferred already has fields
+  - With force=true: Re-runs enrichment, merges with existing
+
+Merge Rules (applied always, even with force):
   - Never overwrites project_meta.user_overrides
   - Only upgrades inferred values if confidence increases
+  - Stores source + confidence per inferred field (e.g., "enrich_agent:web_scrape:forced")
 ```
 
 ### 6.2 Skill Registry Interface
@@ -513,5 +528,5 @@ intake → research → strategy → ux → planning → seo → copywriting →
 
 * **Date**: 2026-01-25
 * **Author**: System Artifact Update
-* **Change Context**: Enhanced `POST /update-project` endpoint to support brand_colors, design_style, project_meta (merge), additional_context (merge), and user_overrides array to mark fields as user-provided
-* **Version**: 1.4.0
+* **Change Context**: Extended `POST /enrich` with `force=true` parameter for re-running enrichment; skips by default if inferred fields exist; merge rules still apply (never overwrite user_overrides, only upgrade on confidence increase); source tracking includes force flag
+* **Version**: 1.5.0
