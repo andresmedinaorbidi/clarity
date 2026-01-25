@@ -79,18 +79,18 @@ export function useOrchestrator() {
   } = useWebsiteState();
 
   // Streaming API with callbacks
+  // PR-01: Backend is the sole authority for steps & state.
+  // The frontend does NOT mutate current_step based on artifact detection.
+  // Visual placeholders (e.g., [GENERATING_SITEMAP]) are still shown in useStreamingAPI,
+  // but step transitions are ONLY driven by backend state updates via |||STATE_UPDATE|||.
   const { sendMessage: streamMessage, loading } = useStreamingAPI({
     onStateUpdate: (newState) => {
+      // This is the ONLY place where WebsiteState (including current_step) is updated.
+      // The newState comes from the backend via |||STATE_UPDATE||| marker.
       setState(newState);
     },
-    onArtifactDetected: (type) => {
-      // Update state when artifact is detected
-      if (type === "sitemap") {
-        setState((prev) => ({ ...prev, current_step: "planning" }));
-      } else if (type === "prd") {
-        setState((prev) => ({ ...prev, current_step: "prd" }));
-      }
-    },
+    // onArtifactDetected intentionally omitted - PR-01 removes client-side step mutations.
+    // Visual placeholders are handled in useStreamingAPI without state mutation.
     onChatUpdate: (content) => {
       // Chat updates are handled by updateChatHistory in the streaming hook
     },

@@ -424,6 +424,7 @@ intake → research → strategy → ux → planning → seo → copywriting →
 * **State updates must be saved** - Call `save_state(session_id, state)` after modifications
 * **State synchronization** - Use `|||STATE_UPDATE|||` marker in streaming responses
 * **Never modify state directly in frontend** - All updates come from backend via SSE
+* **Backend is sole authority for `current_step`** (PR-01) - Frontend must NEVER mutate `current_step` based on client-side heuristics (e.g., artifact detection). Visual placeholders like `[GENERATING_SITEMAP]` are allowed for UX, but step transitions are driven exclusively by backend state updates.
 
 ### 12.3 Agent Development Rules
 
@@ -448,6 +449,7 @@ intake → research → strategy → ux → planning → seo → copywriting →
 * **DO NOT** modify WebsiteState schema without updating both Python and TypeScript
 * **DO NOT** forget to add trigger phrases for new skills
 * **DO NOT** skip prerequisite checks
+* **DO NOT** mutate `current_step` in frontend based on artifact detection or streaming markers (PR-01)
 
 ### 12.6 When Making Changes
 
@@ -463,7 +465,7 @@ intake → research → strategy → ux → planning → seo → copywriting →
 
 ## 13. Last Updated
 
-* **Date**: 2026-01-24
-* **Author**: System Artifact Creation
-* **Change Context**: Initial system artifact creation for token optimization and future reference
-* **Version**: 1.0.0
+* **Date**: 2026-01-25
+* **Author**: PR-01 Implementation
+* **Change Context**: PR-01 - Backend is the sole authority for steps & state. Removed frontend logic in `use-orchestrator.ts` that mutated `current_step` based on artifact detection heuristics. Frontend now only updates `WebsiteState` via backend state updates through `|||STATE_UPDATE|||` marker.
+* **Version**: 1.1.0
