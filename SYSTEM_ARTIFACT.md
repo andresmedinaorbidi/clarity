@@ -217,11 +217,12 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 * `POST /session/new` - Create new session
 * `GET /sessions` - List all sessions
 * `DELETE /session/{session_id}` - Delete session
-* `POST /update-project` - Update project and run intake
+* `POST /update-project` - Update project fields (name, industry, brand_colors, design_style, project_meta, additional_context) with user override support
 * `POST /fetch-external-data` - Fetch CRM data
 * `POST /run-planner` - Manual planner trigger
 * `POST /run-prd` - Manual PRD trigger
 * `POST /chat` - Main streaming endpoint (SSE)
+* `POST /enrich` - Enrich project metadata with inferred fields (scrape ~2s, LLM ~4s timeouts)
 
 **Streaming Protocol** (POST /chat):
 ```
@@ -230,6 +231,34 @@ Response: text/event-stream
   - Chunks: Chat response text
   - Marker: "|||STATE_UPDATE|||"
   - Final chunk: Complete WebsiteState JSON
+```
+
+**Update Project Protocol** (POST /update-project):
+```
+Request: {
+  "project_name": "string",
+  "industry": "string",
+  "brand_colors": ["color1", "color2"],
+  "design_style": "string",
+  "project_meta": { "inferred": {...}, "user_overrides": {...} },
+  "additional_context": { "key": "value" },
+  "user_overrides": ["field1", "field2"]  // marks fields as user-provided
+}
+Response: { "message": "...", "state": WebsiteState }
+Behavior:
+  - project_meta and additional_context are merged (not replaced)
+  - Fields in user_overrides array are written to project_meta.user_overrides
+  - User overrides take precedence over inferred values
+```
+
+**Enrichment Protocol** (POST /enrich):
+```
+Request: { "url": "optional URL to scrape" }
+Response: Complete WebsiteState JSON with updated project_meta.inferred
+Timeouts: Scrape ~2s, LLM ~4s
+Merge Rules:
+  - Never overwrites project_meta.user_overrides
+  - Only upgrades inferred values if confidence increases
 ```
 
 ### 6.2 Skill Registry Interface
@@ -484,5 +513,5 @@ intake → research → strategy → ux → planning → seo → copywriting →
 
 * **Date**: 2026-01-25
 * **Author**: System Artifact Update
-* **Change Context**: Added `ProjectMeta` and `InferredField` models to support structured inference metadata with confidence scores, sources, and rationale; `project_meta` now uses `{inferred, user_overrides}` structure
-* **Version**: 1.2.0
+* **Change Context**: Enhanced `POST /update-project` endpoint to support brand_colors, design_style, project_meta (merge), additional_context (merge), and user_overrides array to mark fields as user-provided
+* **Version**: 1.4.0
