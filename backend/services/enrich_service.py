@@ -2,17 +2,34 @@
 """
 Enrichment service for the /enrich endpoint.
 PR-03: Runs scraper + LLM inference to prefill project defaults.
+PR-05: Safe rerun support with confidence-based upgrade rules.
 
 Stores inferred values in state.project_meta["inferred"] and updates
 active fields ONLY if not overridden by user.
+
+Merge rules (PR-05):
+- User overrides are NEVER touched
+- Inferred fields upgrade only if new_confidence > old_confidence
+- Active fields update only when NOT overridden AND inference was accepted
 """
 
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 from state_schema import WebsiteState
 from utils import get_filled_prompt, ask_gemini
 from services.scraper_service import scrape_website
+
+
+def _coerce_confidence(value: Any) -> float:
+    """
+    Safely coerce a value to a confidence float in [0.0, 1.0].
+    Returns 0.0 for invalid/missing values.
+    """
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def run_enrichment(
@@ -24,32 +41,37 @@ def run_enrichment(
     """
     Run scraper + LLM enrichment based on seed text and optional website URL.
 
-    - Runs scraper if website_url provided (2s timeout)
-    - Runs Gemini with enrich_agent prompt in JSON mode
-    - Merges inferred fields into state.project_meta["inferred"]
-    - Updates active fields (industry, design_style, brand_colors) ONLY if not user-overridden
-    - Stores scrape summary in additional_context (optional)
-    - Adds log lines for success/failure
-    - NEVER throws; always returns state
+    PR-05 enhancements:
+    - Skip logic: if force=False, inferred non-empty, and no website_url, skip
+    - Confidence upgrade: only replace inferred if new_conf > old_conf
+    - Override protection: user overrides are never changed
+    - Active field updates: only when not overridden AND inference accepted
 
     Args:
         state: Current WebsiteState
         seed_text: User's initial input (hero text)
         website_url: Optional website URL to scrape
-        force: If True, run enrichment even if already enriched (default False)
+        force: If True, always rerun enrichment regardless of existing data
 
     Returns:
-        Updated WebsiteState with inferred values
+        Updated WebsiteState with inferred values (never throws)
     """
     # Ensure project_meta has required structure (PR-02)
     _ensure_project_meta_structure(state)
 
-    # Check if already enriched (skip if not forced)
-    if not force and state.project_meta.get("inferred") and len(state.project_meta["inferred"]) > 0:
-        state.logs.append("Enrich: Skipped (already enriched, use force=true to re-run)")
+    # ─────────────────────────────────────────────────────────────────────────
+    # Skip logic (PR-05): Skip if already enriched, no force, no new website
+    # ─────────────────────────────────────────────────────────────────────────
+    existing_inferred = state.project_meta.get("inferred", {})
+    has_existing = len(existing_inferred) > 0
+
+    if not force and has_existing and not website_url:
+        state.logs.append("Enrich: Skipped (already enriched, no website_url, force=false)")
         return state
 
-    state.logs.append(f"Enrich: Starting enrichment for seed: '{seed_text[:50]}...'")
+    # Log run parameters
+    run_mode = "forced" if force else ("rerun with URL" if has_existing else "initial")
+    state.logs.append(f"Enrich: Starting ({run_mode}) for seed: '{seed_text[:50]}...'")
 
     # Step 1: Scrape website if URL provided
     scrape_result = None
@@ -92,13 +114,18 @@ def run_enrichment(
 
 
 def _ensure_project_meta_structure(state: WebsiteState) -> None:
-    """Ensure project_meta has inferred and user_overrides dicts."""
+    """Ensure project_meta and additional_context have required structure (PR-05)."""
+    # project_meta structure
     if not isinstance(state.project_meta, dict):
         state.project_meta = {}
     if "inferred" not in state.project_meta:
         state.project_meta["inferred"] = {}
     if "user_overrides" not in state.project_meta:
         state.project_meta["user_overrides"] = {}
+
+    # additional_context structure
+    if not isinstance(state.additional_context, dict):
+        state.additional_context = {}
 
 
 def _run_llm_inference(
@@ -158,43 +185,106 @@ def _run_llm_inference(
 
 def _merge_inferred_values(state: WebsiteState, inferred: Dict[str, Any]) -> None:
     """
-    Merge inferred values into state.
+    Merge inferred values into state with confidence-based upgrade rules (PR-05).
 
-    - Stores all inferred values in state.project_meta["inferred"]
-    - Updates active fields ONLY if NOT in user_overrides
+    Algorithm:
+    1) For each field in inferred payload:
+       - Compare new_confidence vs old_confidence
+       - ACCEPT if: field doesn't exist OR new_conf > old_conf (strictly greater)
+    2) If ACCEPT:
+       - Store in project_meta["inferred"]
+       - Update active field ONLY if NOT in user_overrides
+    3) If REJECT:
+       - Keep existing inferred value
+       - Log that we kept the old value
+
+    User overrides are NEVER modified (user intent is final).
     """
     user_overrides = state.project_meta.get("user_overrides", {})
+    existing_inferred = state.project_meta.get("inferred", {})
 
-    for field_name, field_data in inferred.items():
-        # Always store in project_meta["inferred"]
-        state.project_meta["inferred"][field_name] = field_data
+    # Counters for logging
+    accepted_count = 0
+    upgraded_count = 0
+    kept_count = 0
 
-        # Check if user has overridden this field
+    for field_name, new_data in inferred.items():
+        # Normalize new data structure
+        if isinstance(new_data, dict):
+            new_value = new_data.get("value")
+            new_conf = _coerce_confidence(new_data.get("confidence", 0))
+            new_source = new_data.get("source", "llm")
+            new_rationale = new_data.get("rationale", "")
+        else:
+            # Handle non-dict values (legacy/simple format)
+            new_value = new_data
+            new_conf = 0.5  # Default confidence for non-structured data
+            new_source = "llm"
+            new_rationale = ""
+
+        # Get old inferred data if exists
+        old_data = existing_inferred.get(field_name)
+        if old_data and isinstance(old_data, dict):
+            old_conf = _coerce_confidence(old_data.get("confidence", 0))
+        else:
+            old_conf = -1.0  # No existing data, will accept new
+
+        # ─────────────────────────────────────────────────────────────────────
+        # Upgrade decision: accept only if new > old (strictly greater)
+        # ─────────────────────────────────────────────────────────────────────
+        accept_new = (old_data is None) or (new_conf > old_conf)
+
+        if not accept_new:
+            kept_count += 1
+            print(f"[Enrich] Kept existing '{field_name}' (old_conf={old_conf:.2f} >= new_conf={new_conf:.2f})")
+            continue
+
+        # Accept new inferred value
+        if old_data is None:
+            accepted_count += 1
+        else:
+            upgraded_count += 1
+            print(f"[Enrich] Upgraded '{field_name}' (old_conf={old_conf:.2f} -> new_conf={new_conf:.2f})")
+
+        # Store in project_meta["inferred"] with standardized structure
+        state.project_meta["inferred"][field_name] = {
+            "value": new_value,
+            "confidence": new_conf,
+            "source": new_source,
+            "rationale": new_rationale,
+        }
+
+        # ─────────────────────────────────────────────────────────────────────
+        # Update active field ONLY if NOT overridden by user
+        # ─────────────────────────────────────────────────────────────────────
         if field_name in user_overrides:
             print(f"[Enrich] Field '{field_name}' is user-overridden, skipping active update")
             continue
 
-        # Update active field if applicable
-        value = field_data.get("value") if isinstance(field_data, dict) else field_data
+        # Update active fields based on field name
+        if field_name == "industry" and new_value:
+            state.industry = str(new_value)
 
-        if field_name == "industry" and value:
-            state.industry = str(value)
+        elif field_name == "design_style" and new_value:
+            state.design_style = str(new_value)
 
-        elif field_name == "design_style" and value:
-            state.design_style = str(value)
-
-        elif field_name == "brand_colors" and value:
-            if isinstance(value, list):
-                state.brand_colors = [str(c) for c in value]
-            elif isinstance(value, str):
+        elif field_name == "brand_colors" and new_value:
+            if isinstance(new_value, list):
+                state.brand_colors = [str(c) for c in new_value]
+            elif isinstance(new_value, str):
                 # Handle comma-separated string
-                state.brand_colors = [c.strip() for c in value.split(",")]
+                state.brand_colors = [c.strip() for c in new_value.split(",")]
 
-        elif field_name == "draft_pages" and value:
+        elif field_name == "draft_pages" and new_value:
             # Store in additional_context, not as active field
-            if isinstance(value, list):
-                state.additional_context["draft_pages"] = value
+            # Also check if draft_pages is overridden
+            if "draft_pages" not in user_overrides:
+                if isinstance(new_value, list):
+                    state.additional_context["draft_pages"] = list(new_value)
 
-        elif field_name == "tone" and value:
-            # Store tone in project_meta for later use
-            state.project_meta["tone"] = str(value)
+        elif field_name == "tone" and new_value:
+            # Store tone in project_meta for later use (not an active field)
+            state.project_meta["tone"] = str(new_value)
+
+    # Log summary
+    state.logs.append(f"Enrich: Merged {accepted_count} new, {upgraded_count} upgraded, {kept_count} kept")

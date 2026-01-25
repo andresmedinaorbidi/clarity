@@ -20,7 +20,7 @@ from agents.router_agent import run_router_agent
 from services.mock_crm import mock_hubspot_fetcher
 from services.enrich_service import run_enrichment
 
-app = FastAPI(title="Clarity by Plinng", version="1.4.0")
+app = FastAPI(title="Clarity by Plinng", version="1.5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,7 +49,7 @@ def get_session_id(
 
 @app.get("/")
 def home():
-    return {"status": "Backend is online", "version": "1.4.0 - Structured fields support"}
+    return {"status": "Backend is online", "version": "1.5.0 - Safe enrichment reruns"}
 
 
 @app.post("/session/new")

@@ -249,7 +249,7 @@ Response: { "message": "...", "state": WebsiteState }
 * Runs Intake Agent audit after updates
 * Backward compatible: existing clients sending only project_name/industry still work
 
-**POST /enrich** (PR-03):
+**POST /enrich** (PR-03, PR-05 enhanced):
 ```
 Request: { "seed_text": "...", "website_url": "..." (optional), "force": false }
 Response: { "message": "Enrichment complete", "state": WebsiteState }
@@ -259,6 +259,12 @@ Response: { "message": "Enrichment complete", "state": WebsiteState }
 * Stores inferred values in `state.project_meta["inferred"]`
 * Updates active fields (industry, design_style, brand_colors) ONLY if not user-overridden
 * Never throws; always returns valid state with logs
+* **PR-05 Safe Rerun Rules:**
+  - Skip if `force=false`, inferred non-empty, and no `website_url` provided
+  - Confidence upgrade: only replace inferred[field] if `new_confidence > old_confidence`
+  - User overrides in `project_meta["user_overrides"]` are NEVER modified
+  - Active fields update only when NOT overridden AND inference was accepted (new or upgraded)
+  - Logs include: run mode (initial/forced/rerun), accepted/upgraded/kept counts
 
 **Streaming Protocol** (POST /chat):
 ```
@@ -515,6 +521,6 @@ intake → research → strategy → ux → planning → seo → copywriting →
 ## 13. Last Updated
 
 * **Date**: 2026-01-25
-* **Author**: PR-04 Implementation
-* **Change Context**: PR-04 - Expanded POST /update-project to accept structured fields (brand_colors, design_style, project_meta, additional_context) with proper merge logic. Top-level field updates are automatically recorded as user_overrides. Nested `project_meta.inferred` and `project_meta.user_overrides` are merged (not replaced). `additional_context` uses shallow merge. User overrides are applied to active WebsiteState fields immediately. Alias keys (`colors`, `style`) are supported. Backward compatible with existing clients.
-* **Version**: 1.4.0
+* **Author**: PR-05 Implementation
+* **Change Context**: PR-05 - Safe rerun of /enrich with confidence-based upgrade rules. Inferred fields only upgrade when `new_confidence > old_confidence`. User overrides are never modified. Active fields (industry, design_style, brand_colors) update only when NOT overridden AND inference was accepted. Skip logic: if force=false, inferred exists, and no website_url, enrichment skips. Enhanced logging with run mode (initial/forced/rerun) and merge counts (accepted/upgraded/kept).
+* **Version**: 1.5.0
