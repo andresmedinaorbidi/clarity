@@ -84,12 +84,13 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 └── frontend/                   # Next.js React application
     ├── src/
     │   ├── app/
-    │   │   ├── page.tsx        # Main application (HeroSection → WorkspaceView)
+    │   │   ├── page.tsx        # Main application (HeroSection → FlowShell, PR-06)
     │   │   ├── layout.tsx      # Root layout
     │   │   └── globals.css     # Tailwind CSS styles
     │   ├── components/magic/   # Specialized UI components
     │   │   ├── HeroSection.tsx      # Initial input form
-    │   │   ├── WorkspaceView.tsx    # Split-view layout (Phase 3)
+    │   │   ├── FlowShell.tsx        # PR-06: Linear full-screen UX container
+    │   │   ├── WorkspaceView.tsx    # Legacy split-view layout (kept for fallback)
     │   │   ├── ChatInterface.tsx    # Chat loop
     │   │   ├── ArtifactWorkspace.tsx # Artifact tabs (Sitemap, PRD, Marketing)
     │   │   ├── BuilderSection.tsx   # Website preview (iframe)
@@ -112,6 +113,15 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 * **backend/helpers/**: Modular utilities for chat, state updates, transitions
 * **frontend/src/components/magic/**: Specialized UI components for each phase
 * **frontend/src/hooks/**: State management and API communication
+
+**FlowShell Routing (PR-06):**
+
+The app now uses a linear full-screen UX flow post-hero:
+1. `page.tsx` checks `USE_FLOW_SHELL` flag (default: true)
+2. After hero submission, renders `FlowShell` instead of `WorkspaceView`
+3. FlowShell routing:
+   - If `state.generated_code` exists → Full-screen website preview (iframe)
+   - Else → Placeholder intake screen (PR-07 will add GuidedIntakeView)
 
 ---
 
@@ -521,6 +531,6 @@ intake → research → strategy → ux → planning → seo → copywriting →
 ## 13. Last Updated
 
 * **Date**: 2026-01-25
-* **Author**: PR-05 Implementation
-* **Change Context**: PR-05 - Safe rerun of /enrich with confidence-based upgrade rules. Inferred fields only upgrade when `new_confidence > old_confidence`. User overrides are never modified. Active fields (industry, design_style, brand_colors) update only when NOT overridden AND inference was accepted. Skip logic: if force=false, inferred exists, and no website_url, enrichment skips. Enhanced logging with run mode (initial/forced/rerun) and merge counts (accepted/upgraded/kept).
-* **Version**: 1.5.0
+* **Author**: PR-06 Implementation
+* **Change Context**: PR-06 - Introduced FlowShell component as the primary post-hero UI container, replacing WorkspaceView. FlowShell implements a linear, full-screen UX flow with routing based on state.generated_code. When generated_code exists, shows full-screen website preview (iframe). Otherwise, shows placeholder intake screen (to be replaced by GuidedIntakeView in PR-07). WorkspaceView kept for fallback via USE_FLOW_SHELL feature flag in page.tsx. No backend changes.
+* **Version**: 1.6.0
