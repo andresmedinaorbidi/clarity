@@ -17,7 +17,8 @@ from agents.intake_agent import run_intake_agent
 from agents.planner_agent import run_planner_agent
 from agents.prd_agent import run_prd_agent
 from agents.router_agent import run_router_agent
-from services import mock_hubspot_fetcher
+from services.mock_crm import mock_hubspot_fetcher
+from services.enrich_service import run_enrichment
 
 app = FastAPI(title="Clarity by Plinng", version="1.1.0")
 
@@ -108,15 +109,50 @@ def update_project(
 ):
     """
     Update project with form data and run intake audit.
+
+    PR-03: Now tracks user overrides in state.project_meta["user_overrides"].
+    When a user explicitly sets a field value, it's recorded as an override
+    so that /enrich won't overwrite it with inferred values.
     """
     sid = get_session_id(x_session_id, session_id)
     state = get_state(sid)
 
+    # Ensure project_meta structure exists (PR-02)
+    if not isinstance(state.project_meta, dict):
+        state.project_meta = {}
+    if "inferred" not in state.project_meta:
+        state.project_meta["inferred"] = {}
+    if "user_overrides" not in state.project_meta:
+        state.project_meta["user_overrides"] = {}
+
     # Update the state with what the user sent
+    # Also track explicit user values as overrides (PR-03)
     if "project_name" in data:
         state.project_name = data["project_name"]
+        state.project_meta["user_overrides"]["project_name"] = data["project_name"]
+
     if "industry" in data:
         state.industry = data["industry"]
+        state.project_meta["user_overrides"]["industry"] = data["industry"]
+
+    if "design_style" in data:
+        state.design_style = data["design_style"]
+        state.project_meta["user_overrides"]["design_style"] = data["design_style"]
+
+    if "brand_colors" in data:
+        state.brand_colors = data["brand_colors"]
+        state.project_meta["user_overrides"]["brand_colors"] = data["brand_colors"]
+
+    # Allow direct project_meta updates (for testing user_overrides)
+    if "project_meta" in data and isinstance(data["project_meta"], dict):
+        # Merge provided project_meta (preserving structure)
+        for key, value in data["project_meta"].items():
+            if key == "user_overrides" and isinstance(value, dict):
+                state.project_meta["user_overrides"].update(value)
+            elif key == "inferred" and isinstance(value, dict):
+                state.project_meta["inferred"].update(value)
+            else:
+                state.project_meta[key] = value
 
     # Run the Intake Agent to check the work
     state = run_intake_agent(state)
@@ -206,6 +242,52 @@ def run_prd(
     response = state.model_dump()
     response["_session_id"] = sid
     return response
+
+
+@app.post("/enrich")
+def enrich(
+    data: dict = Body(...),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
+    session_id: Optional[str] = Query(None)
+):
+    """
+    PR-03: Runs scraper + LLM enrichment based on seed_text and optional website_url.
+
+    Infers business attributes (industry, design_style, brand_colors, etc.) and stores
+    them in state.project_meta["inferred"]. Active fields are updated ONLY if not
+    already overridden by the user (via state.project_meta["user_overrides"]).
+
+    Request body:
+        - seed_text (required): User's initial input describing their business
+        - website_url (optional): Website URL to scrape for additional context
+        - force (optional, default False): Re-run enrichment even if already done
+
+    Returns:
+        - message: Status message
+        - state: Updated WebsiteState with inferred values
+    """
+    sid = get_session_id(x_session_id, session_id)
+    state = get_state(sid)
+
+    # Extract request parameters
+    seed_text = data.get("seed_text", "")
+    website_url = data.get("website_url")
+    force = data.get("force", False)
+
+    if not seed_text:
+        response = state.model_dump()
+        response["_session_id"] = sid
+        return {"message": "No seed_text provided", "state": response}
+
+    # Run enrichment (never throws, always returns state)
+    state = run_enrichment(state, seed_text, website_url, force)
+
+    # Save updated state to DB
+    save_state(sid, state)
+
+    response = state.model_dump()
+    response["_session_id"] = sid
+    return {"message": "Enrichment complete", "state": response}
 
 
 @app.post("/chat")

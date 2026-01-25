@@ -69,12 +69,17 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 │   │   ├── field_updater.py    # State field updates
 │   │   └── step_transitions.py # Step progression logic
 │   ├── prompts/                # Agent instruction templates (.txt files)
+│   │   └── enrich_agent.txt    # PR-03: LLM inference prompt for /enrich
+│   ├── services/               # PR-03: Business logic services
+│   │   ├── __init__.py         # Package exports
+│   │   ├── mock_crm.py         # Mock CRM integrations (moved from services.py)
+│   │   ├── scraper_service.py  # PR-03: Lightweight website scraper
+│   │   └── enrich_service.py   # PR-03: Enrichment orchestration
 │   ├── main.py                 # FastAPI server entry point
-│   ├── state_schema.py         # WebsiteState Pydantic model
+│   ├── state_schema.py         # WebsiteState Pydantic model (PR-02: InferredField)
 │   ├── database.py             # SQLAlchemy session persistence
 │   ├── constants.py            # Step names, markers, gate names
-│   ├── utils.py                # Gemini API helpers
-│   └── services.py             # Mock CRM integrations
+│   └── utils.py                # Gemini API helpers
 │
 └── frontend/                   # Next.js React application
     ├── src/
@@ -216,11 +221,23 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 * `POST /session/new` - Create new session
 * `GET /sessions` - List all sessions
 * `DELETE /session/{session_id}` - Delete session
-* `POST /update-project` - Update project and run intake
+* `POST /update-project` - Update project and run intake (PR-03: now tracks user_overrides)
 * `POST /fetch-external-data` - Fetch CRM data
 * `POST /run-planner` - Manual planner trigger
 * `POST /run-prd` - Manual PRD trigger
+* `POST /enrich` - PR-03: Scraper + LLM inference endpoint (see below)
 * `POST /chat` - Main streaming endpoint (SSE)
+
+**POST /enrich** (PR-03):
+```
+Request: { "seed_text": "...", "website_url": "..." (optional), "force": false }
+Response: { "message": "Enrichment complete", "state": WebsiteState }
+```
+* Runs lightweight scraper (2s timeout) if website_url provided
+* Runs LLM inference via prompts/enrich_agent.txt
+* Stores inferred values in `state.project_meta["inferred"]`
+* Updates active fields (industry, design_style, brand_colors) ONLY if not user-overridden
+* Never throws; always returns valid state with logs
 
 **Streaming Protocol** (POST /chat):
 ```
@@ -477,6 +494,6 @@ intake → research → strategy → ux → planning → seo → copywriting →
 ## 13. Last Updated
 
 * **Date**: 2026-01-25
-* **Author**: PR-02 Implementation
-* **Change Context**: PR-02 - Added schema support for inferred fields and user overrides. New `InferredField` Pydantic model in backend. `project_meta` now defaults to `{inferred: {}, user_overrides: {}}` structure in both backend and frontend. Fixed mutable default arguments in state_schema.py using `Field(default_factory=...)`. TypeScript types updated with `InferredField` and `ProjectMeta` interfaces.
-* **Version**: 1.2.0
+* **Author**: PR-03 Implementation
+* **Change Context**: PR-03 - Implemented POST /enrich endpoint with scraper + LLM inference. Added `backend/services/` package with `scraper_service.py` (lightweight 2s-timeout scraper) and `enrich_service.py` (orchestrates scraping and Gemini inference). Added `prompts/enrich_agent.txt` for LLM inference. Endpoint stores inferred values in `project_meta["inferred"]` and updates active fields only if not user-overridden. Updated `/update-project` to track user overrides.
+* **Version**: 1.3.0
