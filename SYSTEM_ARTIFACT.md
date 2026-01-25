@@ -221,12 +221,33 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 * `POST /session/new` - Create new session
 * `GET /sessions` - List all sessions
 * `DELETE /session/{session_id}` - Delete session
-* `POST /update-project` - Update project and run intake (PR-03: now tracks user_overrides)
+* `POST /update-project` - Update project and run intake (PR-03: tracks user_overrides, PR-04: accepts structured fields with merge logic)
 * `POST /fetch-external-data` - Fetch CRM data
 * `POST /run-planner` - Manual planner trigger
 * `POST /run-prd` - Manual PRD trigger
 * `POST /enrich` - PR-03: Scraper + LLM inference endpoint (see below)
 * `POST /chat` - Main streaming endpoint (SSE)
+
+**POST /update-project** (PR-04 expanded):
+```
+Request: {
+  "project_name": "...",           // optional
+  "industry": "...",               // optional
+  "design_style": "...",           // optional
+  "brand_colors": ["#...", ...],   // optional
+  "project_meta": { ... },         // optional, merged (nested inferred/user_overrides also merged)
+  "additional_context": { ... }    // optional, merged (shallow)
+}
+Response: { "message": "...", "state": WebsiteState }
+```
+* Accepts structured fields beyond project_name/industry
+* Top-level field updates are automatically recorded as user_overrides
+* `project_meta` merge: shallow merge at top level, deep merge for `inferred` and `user_overrides` nested dicts
+* `additional_context` merge: shallow merge (incoming keys added/updated, existing preserved)
+* User overrides from `project_meta.user_overrides` are applied to active WebsiteState fields
+* Alias keys supported: `colors` → `brand_colors`, `style` → `design_style`
+* Runs Intake Agent audit after updates
+* Backward compatible: existing clients sending only project_name/industry still work
 
 **POST /enrich** (PR-03):
 ```
@@ -494,6 +515,6 @@ intake → research → strategy → ux → planning → seo → copywriting →
 ## 13. Last Updated
 
 * **Date**: 2026-01-25
-* **Author**: PR-03 Implementation
-* **Change Context**: PR-03 - Implemented POST /enrich endpoint with scraper + LLM inference. Added `backend/services/` package with `scraper_service.py` (lightweight 2s-timeout scraper) and `enrich_service.py` (orchestrates scraping and Gemini inference). Added `prompts/enrich_agent.txt` for LLM inference. Endpoint stores inferred values in `project_meta["inferred"]` and updates active fields only if not user-overridden. Updated `/update-project` to track user overrides.
-* **Version**: 1.3.0
+* **Author**: PR-04 Implementation
+* **Change Context**: PR-04 - Expanded POST /update-project to accept structured fields (brand_colors, design_style, project_meta, additional_context) with proper merge logic. Top-level field updates are automatically recorded as user_overrides. Nested `project_meta.inferred` and `project_meta.user_overrides` are merged (not replaced). `additional_context` uses shallow merge. User overrides are applied to active WebsiteState fields immediately. Alias keys (`colors`, `style`) are supported. Backward compatible with existing clients.
+* **Version**: 1.4.0

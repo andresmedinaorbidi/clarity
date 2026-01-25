@@ -20,7 +20,7 @@ from agents.router_agent import run_router_agent
 from services.mock_crm import mock_hubspot_fetcher
 from services.enrich_service import run_enrichment
 
-app = FastAPI(title="Clarity by Plinng", version="1.1.0")
+app = FastAPI(title="Clarity by Plinng", version="1.4.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,7 +49,7 @@ def get_session_id(
 
 @app.get("/")
 def home():
-    return {"status": "Backend is online", "version": "1.1.0 - Session-based persistence"}
+    return {"status": "Backend is online", "version": "1.4.0 - Structured fields support"}
 
 
 @app.post("/session/new")
@@ -110,14 +110,28 @@ def update_project(
     """
     Update project with form data and run intake audit.
 
-    PR-03: Now tracks user overrides in state.project_meta["user_overrides"].
-    When a user explicitly sets a field value, it's recorded as an override
-    so that /enrich won't overwrite it with inferred values.
+    PR-03: Tracks user overrides in state.project_meta["user_overrides"].
+    PR-04: Accepts structured fields (brand_colors, design_style, project_meta,
+           additional_context) with proper merge logic.
+
+    Supported fields:
+    - project_name (str): Project/business name
+    - industry (str): Business industry
+    - design_style (str): Visual design style preference
+    - brand_colors (list[str]): Brand color hex values
+    - project_meta (dict): Merged with existing; nested "inferred" and
+      "user_overrides" dicts are also merged (not replaced)
+    - additional_context (dict): Merged with existing (shallow merge)
+
+    Top-level field updates are automatically recorded as user_overrides.
+    User overrides from project_meta are applied to active WebsiteState fields.
     """
     sid = get_session_id(x_session_id, session_id)
     state = get_state(sid)
 
-    # Ensure project_meta structure exists (PR-02)
+    # ─────────────────────────────────────────────────────────────────────────
+    # 1. Ensure defaults exist (defensive, PR-02/PR-04)
+    # ─────────────────────────────────────────────────────────────────────────
     if not isinstance(state.project_meta, dict):
         state.project_meta = {}
     if "inferred" not in state.project_meta:
@@ -125,8 +139,13 @@ def update_project(
     if "user_overrides" not in state.project_meta:
         state.project_meta["user_overrides"] = {}
 
-    # Update the state with what the user sent
-    # Also track explicit user values as overrides (PR-03)
+    if not isinstance(state.additional_context, dict):
+        state.additional_context = {}
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 2. Update active fields from top-level payload (PR-03/PR-04)
+    #    Also record as user_overrides so /enrich won't overwrite them
+    # ─────────────────────────────────────────────────────────────────────────
     if "project_name" in data:
         state.project_name = data["project_name"]
         state.project_meta["user_overrides"]["project_name"] = data["project_name"]
@@ -143,21 +162,67 @@ def update_project(
         state.brand_colors = data["brand_colors"]
         state.project_meta["user_overrides"]["brand_colors"] = data["brand_colors"]
 
-    # Allow direct project_meta updates (for testing user_overrides)
+    # ─────────────────────────────────────────────────────────────────────────
+    # 3. Merge project_meta with nested handling (PR-04)
+    #    - Shallow merge at top level
+    #    - Deep merge for "inferred" and "user_overrides" nested dicts
+    # ─────────────────────────────────────────────────────────────────────────
     if "project_meta" in data and isinstance(data["project_meta"], dict):
-        # Merge provided project_meta (preserving structure)
-        for key, value in data["project_meta"].items():
+        incoming_meta = data["project_meta"]
+        for key, value in incoming_meta.items():
             if key == "user_overrides" and isinstance(value, dict):
+                # Merge nested user_overrides (don't replace)
                 state.project_meta["user_overrides"].update(value)
             elif key == "inferred" and isinstance(value, dict):
+                # Merge nested inferred (don't replace)
                 state.project_meta["inferred"].update(value)
             else:
+                # Shallow merge for other keys
                 state.project_meta[key] = value
 
-    # Run the Intake Agent to check the work
+    # ─────────────────────────────────────────────────────────────────────────
+    # 4. Merge additional_context (PR-04)
+    #    Shallow merge: incoming keys are added/updated, existing keys preserved
+    # ─────────────────────────────────────────────────────────────────────────
+    if "additional_context" in data and isinstance(data["additional_context"], dict):
+        state.additional_context.update(data["additional_context"])
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 5. Apply user overrides to active fields (PR-04)
+    #    If project_meta.user_overrides contains field values, apply them to
+    #    the corresponding active WebsiteState fields. This ensures overrides
+    #    sent via project_meta take effect immediately.
+    # ─────────────────────────────────────────────────────────────────────────
+    overrides = state.project_meta.get("user_overrides", {})
+
+    if "industry" in overrides and overrides["industry"]:
+        state.industry = overrides["industry"]
+
+    if "design_style" in overrides and overrides["design_style"]:
+        state.design_style = overrides["design_style"]
+
+    if "brand_colors" in overrides and overrides["brand_colors"]:
+        state.brand_colors = overrides["brand_colors"]
+
+    # Handle common alias keys defensively (future-proofing)
+    if "colors" in overrides and overrides["colors"] and "brand_colors" not in overrides:
+        state.brand_colors = overrides["colors"]
+        # Normalize to canonical key
+        state.project_meta["user_overrides"]["brand_colors"] = overrides["colors"]
+
+    if "style" in overrides and overrides["style"] and "design_style" not in overrides:
+        state.design_style = overrides["style"]
+        # Normalize to canonical key
+        state.project_meta["user_overrides"]["design_style"] = overrides["style"]
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 6. Run Intake Agent audit (existing behavior)
+    # ─────────────────────────────────────────────────────────────────────────
     state = run_intake_agent(state)
 
-    # Save updated state to DB
+    # ─────────────────────────────────────────────────────────────────────────
+    # 7. Save state and return
+    # ─────────────────────────────────────────────────────────────────────────
     save_state(sid, state)
 
     response = state.model_dump()
