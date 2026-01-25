@@ -89,12 +89,16 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
     │   │   └── globals.css     # Tailwind CSS styles
     │   ├── components/magic/   # Specialized UI components
     │   │   ├── HeroSection.tsx      # Initial input form
-    │   │   ├── FlowShell.tsx        # PR-06: Linear full-screen UX container
+    │   │   ├── FlowShell.tsx        # PR-06/07: Linear full-screen UX container
     │   │   ├── WorkspaceView.tsx    # Legacy split-view layout (kept for fallback)
     │   │   ├── ChatInterface.tsx    # Chat loop
     │   │   ├── ArtifactWorkspace.tsx # Artifact tabs (Sitemap, PRD, Marketing)
     │   │   ├── BuilderSection.tsx   # Website preview (iframe)
     │   │   └── AgentTrace.tsx       # Agent reasoning visualization
+    │   ├── components/intake/  # PR-07: Guided intake wizard
+    │   │   ├── GuidedIntakeView.tsx      # Main wizard component
+    │   │   ├── intakeQuestions.ts        # Question definitions and field helpers
+    │   │   └── components/pickers/       # UI pickers (SingleSelectChips, ColorPicker, etc.)
     │   ├── hooks/
     │   │   └── use-orchestrator.ts  # State management & streaming API client
     │   ├── contexts/
@@ -114,14 +118,24 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 * **frontend/src/components/magic/**: Specialized UI components for each phase
 * **frontend/src/hooks/**: State management and API communication
 
-**FlowShell Routing (PR-06):**
+**FlowShell Routing (PR-06/PR-07):**
 
 The app now uses a linear full-screen UX flow post-hero:
 1. `page.tsx` checks `USE_FLOW_SHELL` flag (default: true)
 2. After hero submission, renders `FlowShell` instead of `WorkspaceView`
 3. FlowShell routing:
    - If `state.generated_code` exists → Full-screen website preview (iframe)
-   - Else → Placeholder intake screen (PR-07 will add GuidedIntakeView)
+   - Else → GuidedIntakeView (PR-07: wizard with pickers)
+
+**Guided Intake (PR-07):**
+
+GuidedIntakeView displays one question at a time:
+- Questions: project_name → industry → goal → design_style → tone → brand_colors → font_pair → draft_pages
+- Field value priority: `user_overrides` > `inferred` > top-level state > empty
+- Persistence: calls `/update-project` with both field value and `project_meta.user_overrides`
+- Pickers: SingleSelectChips, MultiSelectChips, StyleChooser, ColorPicker, FontPicker
+- Each question has "Type instead" toggle for free-form input
+- Completion screen shows summary and "Create Website" CTA
 
 ---
 
@@ -531,6 +545,6 @@ intake → research → strategy → ux → planning → seo → copywriting →
 ## 13. Last Updated
 
 * **Date**: 2026-01-25
-* **Author**: PR-06 Implementation
-* **Change Context**: PR-06 - Introduced FlowShell component as the primary post-hero UI container, replacing WorkspaceView. FlowShell implements a linear, full-screen UX flow with routing based on state.generated_code. When generated_code exists, shows full-screen website preview (iframe). Otherwise, shows placeholder intake screen (to be replaced by GuidedIntakeView in PR-07). WorkspaceView kept for fallback via USE_FLOW_SHELL feature flag in page.tsx. No backend changes.
-* **Version**: 1.6.0
+* **Author**: PR-07 Implementation
+* **Change Context**: PR-07 - Implemented GuidedIntakeView with full-screen wizard UX. Added intake components: GuidedIntakeView, intakeQuestions.ts, QuestionCard, and pickers (SingleSelectChips, MultiSelectChips, ColorPicker, StyleChooser, FontPicker). Questions displayed one at a time with progress bar. Field value priority: user_overrides > inferred > state. All selections persist via /update-project with user_overrides. "Type instead" toggle for free-form input. Completion screen with summary and "Create Website" CTA. FlowShell now renders GuidedIntakeView instead of placeholder. No backend changes.
+* **Version**: 1.7.0
