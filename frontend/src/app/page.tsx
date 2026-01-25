@@ -1,7 +1,7 @@
 "use client";
 import { useOrchestrator } from "@/hooks/use-orchestrator";
 import HeroSection from "@/components/magic/HeroSection";
-import WorkspaceView from "@/components/magic/WorkspaceView";
+import FlowShell from "@/components/magic/FlowShell";
 import AgentTrace from "@/components/magic/AgentTrace";
 import { AdvancedModeProvider, useAdvancedMode } from "@/contexts/AdvancedModeContext";
 import { AnimatePresence, motion } from "framer-motion";
@@ -29,10 +29,10 @@ function HomeContent() {
           </motion.div>
         )}
 
-        {/* WORKSPACE: Split-view layout after first message */}
+        {/* FLOW SHELL: Main workspace after first interaction */}
         {chatCount > 0 && (
-          <motion.div key="workspace" className="h-full" {...fadeProps}>
-            <WorkspaceView state={state} onSend={sendMessage} loading={loading} />
+          <motion.div key="flow-shell" className="h-full" {...fadeProps}>
+            <FlowShell state={state} onSend={sendMessage} loading={loading} />
           </motion.div>
         )}
       </AnimatePresence>

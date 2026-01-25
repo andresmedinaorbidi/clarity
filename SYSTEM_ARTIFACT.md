@@ -79,12 +79,13 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 └── frontend/                   # Next.js React application
     ├── src/
     │   ├── app/
-    │   │   ├── page.tsx        # Main application (HeroSection → WorkspaceView)
+    │   │   ├── page.tsx        # Main application (HeroSection → FlowShell)
     │   │   ├── layout.tsx      # Root layout
     │   │   └── globals.css     # Tailwind CSS styles
     │   ├── components/magic/   # Specialized UI components
     │   │   ├── HeroSection.tsx      # Initial input form
-    │   │   ├── WorkspaceView.tsx    # Split-view layout (Phase 3)
+    │   │   ├── FlowShell.tsx        # Main workspace shell (post-hero flow)
+    │   │   ├── WorkspaceView.tsx    # Legacy split-view (deprecated)
     │   │   ├── ChatInterface.tsx    # Chat loop
     │   │   ├── ArtifactWorkspace.tsx # Artifact tabs (Sitemap, PRD, Marketing)
     │   │   ├── BuilderSection.tsx   # Website preview (iframe)
@@ -528,5 +529,5 @@ intake → research → strategy → ux → planning → seo → copywriting →
 
 * **Date**: 2026-01-25
 * **Author**: System Artifact Update
-* **Change Context**: Extended `POST /enrich` with `force=true` parameter for re-running enrichment; skips by default if inferred fields exist; merge rules still apply (never overwrite user_overrides, only upgrade on confidence increase); source tracking includes force flag
-* **Version**: 1.5.0
+* **Change Context**: Introduced `FlowShell.tsx` as the main workspace shell component (replaces WorkspaceView in page.tsx flow); FlowShell manages post-hero split-view layout with chat (left) and artifact workspace (right); WorkspaceView marked as deprecated
+* **Version**: 1.6.0
