@@ -1,6 +1,26 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
+
+class InferredField(BaseModel):
+    """Represents a field value inferred by an agent with metadata."""
+    value: Any
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence score 0-1")
+    source: str = ""  # e.g., "research_agent", "strategy_agent", "user_input"
+    rationale: str = ""  # Explanation of why this value was inferred
+
+
+class ProjectMeta(BaseModel):
+    """
+    Project metadata with support for inferred values and user overrides.
+
+    - inferred: Agent-inferred values with confidence and rationale
+    - user_overrides: User-provided values that take precedence over inferred
+    """
+    inferred: Dict[str, InferredField] = {}
+    user_overrides: Dict[str, Any] = {}
+
+
 class AgentReasoning(BaseModel):
     agent_name: str
     thought: str
@@ -35,7 +55,7 @@ class WebsiteState(BaseModel):
     chat_history: List[Dict[str, str]] = []
 
     # 5. Extended Architecture Support
-    project_meta: Dict[str, Any] = {}  # Brand guidelines, target audience, business goals, inferred_fields: List[str]
+    project_meta: ProjectMeta = Field(default_factory=ProjectMeta)  # Inferred values + user overrides
     agent_reasoning: List[AgentReasoning] = []  # Agent thoughts and certainty levels
     seo_data: Optional[Dict[str, Any]] = None  # Keywords, meta titles, descriptions
     ux_strategy: Optional[Dict[str, Any]] = None  # User personas, conversion maps

@@ -129,6 +129,16 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
   * State stored in `project_states` table (SQLite)
   * Frontend sends `X-Session-ID` header for state isolation
 
+* **ProjectMeta**: Structured metadata container
+  * `inferred`: Dict of agent-inferred values with metadata
+  * `user_overrides`: Dict of user-provided values (take precedence)
+
+* **InferredField**: Metadata for inferred values
+  * `value`: The inferred value (any type)
+  * `confidence`: Float 0-1 indicating certainty
+  * `source`: Agent that inferred the value (e.g., "research_agent")
+  * `rationale`: Explanation of inference reasoning
+
 ### 4.2 Key Attributes
 
 **WebsiteState** (backend/state_schema.py):
@@ -141,7 +151,8 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 * `generated_code` (final HTML/Tailwind CSS)
 * `current_step` (workflow step: intake, research, strategy, ux, planning, seo, copywriting, prd, building)
 * `chat_history` (conversation log)
-* `project_meta`, `seo_data`, `ux_strategy`, `copywriting` (specialist outputs)
+* `project_meta` (structured: `{inferred: {field: {value, confidence, source, rationale}}, user_overrides: {field: value}}`)
+* `seo_data`, `ux_strategy`, `copywriting` (specialist outputs)
 * `agent_reasoning` (transparency: agent thoughts and certainty)
 * `context_summary` (compressed project history)
 
@@ -473,5 +484,5 @@ intake → research → strategy → ux → planning → seo → copywriting →
 
 * **Date**: 2026-01-25
 * **Author**: System Artifact Update
-* **Change Context**: Removed frontend `current_step` mutation logic; `current_step` is now exclusively managed by backend via state updates
-* **Version**: 1.1.0
+* **Change Context**: Added `ProjectMeta` and `InferredField` models to support structured inference metadata with confidence scores, sources, and rationale; `project_meta` now uses `{inferred, user_overrides}` structure
+* **Version**: 1.2.0

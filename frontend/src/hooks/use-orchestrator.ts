@@ -25,6 +25,18 @@ export interface AgentReasoning {
   certainty: number;
 }
 
+export interface InferredField {
+  value: unknown;
+  confidence: number; // 0-1
+  source: string; // e.g., "research_agent", "strategy_agent", "user_input"
+  rationale: string; // Explanation of why this value was inferred
+}
+
+export interface ProjectMeta {
+  inferred: Record<string, InferredField>;
+  user_overrides: Record<string, unknown>;
+}
+
 export interface SitemapPage {
   title: string;
   purpose: string;
@@ -44,7 +56,7 @@ export interface WebsiteState {
   prd_document: string;
   generated_code: string;
   chat_history: Message[];
-  project_meta: Record<string, unknown>;
+  project_meta: ProjectMeta;
   agent_reasoning: AgentReasoning[];
   seo_data?: Record<string, unknown> | null;
   ux_strategy?: Record<string, unknown> | null;
