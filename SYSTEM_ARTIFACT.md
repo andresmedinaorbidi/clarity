@@ -239,6 +239,12 @@ Response: text/event-stream
 * Frontend parses: `JSON.parse(parts[1].trim())`
 * Frontend updates: `setState({ ...prev, ...newState })`
 
+**Step Transition Rule:**
+* `current_step` is **exclusively managed by the backend**
+* Frontend MUST NOT mutate `current_step` directly
+* Step transitions occur only via `|||STATE_UPDATE|||` state updates from backend
+* Artifact detection (sitemap, PRD) triggers UI placeholders but does not change step
+
 **Gate Action Protocol:**
 * Backend emits: `"[GATE_ACTION: GATE_NAME]"`
 * Frontend detects: `GATE_ACTION_PATTERN` regex
@@ -424,6 +430,7 @@ intake → research → strategy → ux → planning → seo → copywriting →
 * **State updates must be saved** - Call `save_state(session_id, state)` after modifications
 * **State synchronization** - Use `|||STATE_UPDATE|||` marker in streaming responses
 * **Never modify state directly in frontend** - All updates come from backend via SSE
+* **`current_step` is backend-only** - Frontend must never mutate `current_step`; it is set exclusively by backend via state updates
 
 ### 12.3 Agent Development Rules
 
@@ -448,6 +455,7 @@ intake → research → strategy → ux → planning → seo → copywriting →
 * **DO NOT** modify WebsiteState schema without updating both Python and TypeScript
 * **DO NOT** forget to add trigger phrases for new skills
 * **DO NOT** skip prerequisite checks
+* **DO NOT** mutate `current_step` in frontend code - backend is the single source of truth for step transitions
 
 ### 12.6 When Making Changes
 
@@ -463,7 +471,7 @@ intake → research → strategy → ux → planning → seo → copywriting →
 
 ## 13. Last Updated
 
-* **Date**: 2026-01-24
-* **Author**: System Artifact Creation
-* **Change Context**: Initial system artifact creation for token optimization and future reference
-* **Version**: 1.0.0
+* **Date**: 2026-01-25
+* **Author**: System Artifact Update
+* **Change Context**: Removed frontend `current_step` mutation logic; `current_step` is now exclusively managed by backend via state updates
+* **Version**: 1.1.0

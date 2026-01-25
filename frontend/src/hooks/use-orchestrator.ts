@@ -79,25 +79,13 @@ export function useOrchestrator() {
   } = useWebsiteState();
 
   // Streaming API with callbacks
+  // Note: current_step is exclusively managed by backend via state updates
   const { sendMessage: streamMessage, loading } = useStreamingAPI({
     onStateUpdate: (newState) => {
       setState(newState);
     },
-    onArtifactDetected: (type) => {
-      // Update state when artifact is detected
-      if (type === "sitemap") {
-        setState((prev) => ({ ...prev, current_step: "planning" }));
-      } else if (type === "prd") {
-        setState((prev) => ({ ...prev, current_step: "prd" }));
-      }
-    },
-    onChatUpdate: (content) => {
-      // Chat updates are handled by updateChatHistory in the streaming hook
-    },
     onError: (errorMessage) => {
-      // Set error state
       setError(errorMessage);
-      // Error handling - fetchInitialState will handle session errors
       if (errorMessage.includes("session expired")) {
         fetchInitialState();
       }
