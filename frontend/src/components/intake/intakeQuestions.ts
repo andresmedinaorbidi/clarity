@@ -218,11 +218,8 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
  * Priority: user_overrides > inferred > direct state value > empty
  */
 export function getFieldValue(
-  state: {
-    project_meta?: { user_overrides?: Record<string, unknown>; inferred?: Record<string, { value: unknown }> };
-    additional_context?: Record<string, unknown>;
-    [key: string]: unknown;
-  },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  state: any,
   field: string,
   isTopLevel?: boolean,
   isAdditionalContext?: boolean
@@ -251,4 +248,133 @@ export function getFieldValue(
   }
 
   return undefined;
+}
+
+/**
+ * PR-07.1: Priority option metadata for UI highlighting
+ */
+export interface PriorityOptionMeta {
+  value: string;
+  type: "user" | "inferred";
+  label: string; // "From your description" or "Recommended"
+}
+
+/**
+ * PR-07.1: Result of building priority options
+ */
+export interface PriorityOptionsResult {
+  options: QuestionOption[];
+  priorityMeta: PriorityOptionMeta[];
+  selectedValue: string | undefined;
+}
+
+/**
+ * PR-07.1: Build options list with user-provided and inferred values injected at top
+ *
+ * @param defaultOptions - The default options for this question
+ * @param userValue - User-provided value from overrides (highest priority)
+ * @param inferredValue - AI-inferred value (secondary priority)
+ * @param currentValue - Currently selected value
+ * @returns Options array with priority values injected, plus metadata for UI
+ */
+export function buildPriorityOptions(
+  defaultOptions: QuestionOption[],
+  userValue: string | undefined,
+  inferredValue: string | undefined,
+  currentValue: unknown
+): PriorityOptionsResult {
+  const result: QuestionOption[] = [];
+  const priorityMeta: PriorityOptionMeta[] = [];
+  const existingValues = new Set(defaultOptions.map(o => o.value.toLowerCase()));
+
+  // 1. Inject user-provided value at top if not in defaults
+  if (userValue && !existingValues.has(userValue.toLowerCase())) {
+    result.push({
+      value: userValue,
+      label: userValue,
+      description: "Your selection",
+    });
+    priorityMeta.push({ value: userValue, type: "user", label: "From your description" });
+    existingValues.add(userValue.toLowerCase());
+  } else if (userValue) {
+    // Mark existing option as user-provided
+    priorityMeta.push({ value: userValue, type: "user", label: "From your description" });
+  }
+
+  // 2. Inject inferred value at second position if different from user and not in defaults
+  if (inferredValue && inferredValue !== userValue && !existingValues.has(inferredValue.toLowerCase())) {
+    result.push({
+      value: inferredValue,
+      label: inferredValue,
+      description: "AI recommendation",
+    });
+    priorityMeta.push({ value: inferredValue, type: "inferred", label: "Recommended" });
+    existingValues.add(inferredValue.toLowerCase());
+  } else if (inferredValue && inferredValue !== userValue) {
+    // Mark existing option as inferred
+    priorityMeta.push({ value: inferredValue, type: "inferred", label: "Recommended" });
+  }
+
+  // 3. Add all default options
+  result.push(...defaultOptions);
+
+  // 4. Determine selected value: user > inferred > currentValue
+  let selectedValue: string | undefined;
+  if (userValue) {
+    selectedValue = userValue;
+  } else if (inferredValue) {
+    selectedValue = inferredValue;
+  } else if (typeof currentValue === "string") {
+    selectedValue = currentValue;
+  }
+
+  return { options: result, priorityMeta, selectedValue };
+}
+
+/**
+ * PR-07.1: Check if a field has a user-provided value (should skip question)
+ */
+export function hasUserProvidedValue(
+  state: {
+    project_meta?: { user_overrides?: Record<string, unknown> };
+  },
+  field: string
+): boolean {
+  const overrides = state.project_meta?.user_overrides ?? {};
+  const value = overrides[field];
+  return value !== undefined && value !== null && value !== "";
+}
+
+/**
+ * PR-07.1: Get inferred value with metadata for a field
+ */
+export function getInferredValueWithMeta(
+  state: {
+    project_meta?: { inferred?: Record<string, { value: unknown; confidence?: number; source?: string; rationale?: string }> };
+  },
+  field: string
+): { value: unknown; confidence?: number; source?: string; rationale?: string } | undefined {
+  const inferredRecord = state.project_meta?.inferred;
+  if (inferredRecord && field in inferredRecord && inferredRecord[field]?.value !== undefined) {
+    return inferredRecord[field];
+  }
+  return undefined;
+}
+
+/**
+ * PR-07.1: Filter questions based on state (skip questions with user-provided values)
+ */
+export function getActiveQuestions(
+  questions: IntakeQuestion[],
+  state: {
+    project_meta?: { user_overrides?: Record<string, unknown>; inferred?: Record<string, { value: unknown }> };
+  }
+): IntakeQuestion[] {
+  return questions.filter(q => {
+    // Skip business name question if user already provided it
+    if (q.field === "project_name" && hasUserProvidedValue(state, "project_name")) {
+      return false;
+    }
+    return true;
+  });
 }

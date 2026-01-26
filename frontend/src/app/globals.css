@@ -101,3 +101,79 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ============================================================================
+   PR-07.1: Global Button Styles
+   ============================================================================ */
+
+/* Primary button: Black background, white text */
+.btn-primary {
+  background-color: #111827;
+  color: white;
+  padding: 0.75rem 2rem;
+  border-radius: 0.75rem;
+  font-weight: 500;
+  transition: all 150ms ease;
+}
+.btn-primary:hover:not(:disabled) {
+  background-color: #1f2937;
+}
+.btn-primary:disabled {
+  background-color: var(--brand-border);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/* Secondary button: Outline style */
+.btn-secondary {
+  background-color: transparent;
+  color: var(--text-primary);
+  padding: 0.75rem 2rem;
+  border-radius: 0.75rem;
+  font-weight: 500;
+  border: 1px solid var(--brand-border);
+  transition: all 150ms ease;
+}
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--brand-surface);
+  border-color: var(--text-muted);
+}
+
+/* AI/Recommended badge styling */
+.badge-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  background-color: color-mix(in srgb, var(--brand-accent) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 30%, transparent);
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--brand-accent);
+}
+
+/* User-provided badge styling */
+.badge-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  background-color: color-mix(in srgb, var(--brand-primary) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 40%, transparent);
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* Progress bar fill using brand accent */
+.progress-bar-fill {
+  background-color: var(--brand-accent);
+}
+
+/* Recommended option highlight border */
+.option-recommended {
+  border-color: var(--brand-accent) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-accent) 30%, transparent);
+}

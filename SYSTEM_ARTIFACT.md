@@ -84,9 +84,9 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 └── frontend/                   # Next.js React application
     ├── src/
     │   ├── app/
-    │   │   ├── page.tsx        # Main application (HeroSection → FlowShell, PR-06)
+    │   │   ├── page.tsx        # Main application (HeroSection → BootstrappingScreen → FlowShell, PR-07.1)
     │   │   ├── layout.tsx      # Root layout
-    │   │   └── globals.css     # Tailwind CSS styles
+    │   │   └── globals.css     # Tailwind CSS styles + PR-07.1 global button/badge classes
     │   ├── components/magic/   # Specialized UI components
     │   │   ├── HeroSection.tsx      # Initial input form
     │   │   ├── FlowShell.tsx        # PR-06/07: Linear full-screen UX container
@@ -118,23 +118,38 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 * **frontend/src/components/magic/**: Specialized UI components for each phase
 * **frontend/src/hooks/**: State management and API communication
 
-**FlowShell Routing (PR-06/PR-07):**
+**FlowShell Routing (PR-06/PR-07/PR-07.1/PR-07.1b):**
 
 The app now uses a linear full-screen UX flow post-hero:
 1. `page.tsx` checks `USE_FLOW_SHELL` flag (default: true)
-2. After hero submission, renders `FlowShell` instead of `WorkspaceView`
+2. After hero submission (PR-07.1b enhanced):
+   - Shows `BootstrappingScreen` ("Setting things up…") immediately
+   - Calls `/enrich` endpoint via `enrichProject()` to populate inferred values
+   - Calls `refreshState()` to sync enriched data to React state
+   - Then sends chat message via `sendMessage()`
+   - State readiness check: requires actual data (not empty objects) - `Object.keys().length > 0` for `inferred` and `additional_context`
+   - Transitions to FlowShell only when `isStateReady && !loading`
 3. FlowShell routing:
    - If `state.generated_code` exists → Full-screen website preview (iframe)
    - Else → GuidedIntakeView (PR-07: wizard with pickers)
+4. PR-07.1: Business name handling:
+   - If user-provided in hero → skip business name question
+   - If inferred only → show `InferredNameBanner` with Edit option
 
-**Guided Intake (PR-07):**
+**Guided Intake (PR-07/PR-07.1):**
 
 GuidedIntakeView displays one question at a time:
 - Questions: project_name → industry → goal → design_style → tone → brand_colors → font_pair → draft_pages
+- PR-07.1: project_name question skipped if user-provided (via hero or override)
 - Field value priority: `user_overrides` > `inferred` > top-level state > empty
 - Persistence: calls `/update-project` with both field value and `project_meta.user_overrides`
 - Pickers: SingleSelectChips, MultiSelectChips, StyleChooser, ColorPicker, FontPicker
+- PR-07.1: Priority options - inferred/user values injected at top of option lists with badges:
+  - "Recommended" badge (purple) for AI-inferred values
+  - "From your description" badge (green) for user-provided values
 - Each question has "Type instead" toggle for free-form input
+- PR-07.1: Progress bar uses brand accent purple, shows "Step X of Y"
+- PR-07.1: Buttons use global `.btn-primary` class (black)
 - Completion screen shows summary and "Create Website" CTA
 
 ---
@@ -227,11 +242,12 @@ GuidedIntakeView displays one question at a time:
 
 * Intake must complete (no missing_info) before proceeding to research
 * Project Brief (strategy) must be approved before UX phase
-* Sitemap (planning) requires approval (Gate 1: Blueprint)
-* Marketing content (copywriting) requires approval (Gate 2: Marketing)
+* PR-07.1: Sitemap (planning) no longer requires approval gate - user approval happens at guided intake completion ("Create Website" button)
+* Marketing content (copywriting) requires approval (Gate 2: Marketing) - currently disabled in new flow
 * Memory compression runs every 5 chat turns
 * URL detection automatically triggers research agent
 * CRM data fetching runs automatically if project_name matches known companies
+* PR-07.1: After "Create Website" click, build chain runs uninterrupted: research → strategy → ux → planning → seo → copywriting → prd → building
 
 ---
 
@@ -544,7 +560,15 @@ intake → research → strategy → ux → planning → seo → copywriting →
 
 ## 13. Last Updated
 
-* **Date**: 2026-01-25
-* **Author**: PR-07 Implementation
-* **Change Context**: PR-07 - Implemented GuidedIntakeView with full-screen wizard UX. Added intake components: GuidedIntakeView, intakeQuestions.ts, QuestionCard, and pickers (SingleSelectChips, MultiSelectChips, ColorPicker, StyleChooser, FontPicker). Questions displayed one at a time with progress bar. Field value priority: user_overrides > inferred > state. All selections persist via /update-project with user_overrides. "Type instead" toggle for free-form input. Completion screen with summary and "Create Website" CTA. FlowShell now renders GuidedIntakeView instead of placeholder. No backend changes.
-* **Version**: 1.7.0
+* **Date**: 2026-01-26
+* **Author**: PR-07.1b Implementation
+* **Change Context**: PR-07.1b - Fix bootstrapping loading screen persistence.
+  - **Problem**: Bootstrapping screen ("Setting things up...") appeared briefly then disappeared before inferred values were populated. Root cause: `/enrich` endpoint was never called from frontend, and `isStateReady` condition was truthy for empty objects.
+  - **Solution**:
+    - Added `enrichProject()` function to `api.ts` - calls `/enrich` endpoint with seed text and optional website URL
+    - Updated `handleHeroStart` in `page.tsx` to call `enrichProject()` first, then `refreshState()` to sync data, then `sendMessage()`
+    - Fixed `isStateReady` condition to check `Object.keys().length > 0` for `inferred` and `additional_context` (empty `{}` is truthy in JS)
+    - Added `extractUrl()` helper to parse URLs from hero input for enrichment
+  - **Modified Files**: api.ts, page.tsx, SYSTEM_ARTIFACT.md
+  - **Previous (PR-07.1)**: Global Styles, Progress Bar, Priority Options, Business Name Handling, Bootstrapping Screen, Planning Pause Fix
+* **Version**: 1.7.2

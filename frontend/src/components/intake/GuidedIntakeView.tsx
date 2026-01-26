@@ -1,14 +1,20 @@
 "use client";
 /**
- * GuidedIntakeView - Full-screen guided intake wizard (PR-07)
+ * GuidedIntakeView - Full-screen guided intake wizard (PR-07, PR-07.1)
  *
  * Displays one question at a time, reads inferred defaults,
  * and persists user selections to backend via /update-project.
  *
+ * PR-07.1 Updates:
+ * - Business name skip if user-provided, banner if inferred
+ * - Progress bar uses brand accent purple
+ * - Buttons use global .btn-primary class (black)
+ * - Priority options with user/inferred badges
+ *
  * Priority for field values: user_overrides > inferred > state field > empty
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { WebsiteState } from "@/hooks/use-orchestrator";
 import { updateProject, getProjectState } from "@/lib/api";
@@ -16,6 +22,9 @@ import QuestionCard from "./components/QuestionCard";
 import {
   INTAKE_QUESTIONS,
   getFieldValue,
+  getActiveQuestions,
+  getInferredValueWithMeta,
+  hasUserProvidedValue,
   type IntakeQuestion,
 } from "./intakeQuestions";
 
@@ -67,7 +76,7 @@ function buildUpdatePayload(
 }
 
 /**
- * Progress indicator component
+ * Progress indicator component (PR-07.1: Uses brand accent purple)
  */
 function ProgressBar({
   current,
@@ -82,19 +91,82 @@ function ProgressBar({
     <div className="w-full max-w-md mx-auto mb-8">
       <div className="flex items-center justify-between text-sm text-text-muted mb-2">
         <span>
-          Question {current + 1} of {total}
+          Step {current + 1} of {total}
         </span>
         <span>{Math.round(progress)}%</span>
       </div>
-      <div className="h-1.5 bg-surface-dark rounded-full overflow-hidden">
+      <div className="h-1.5 bg-brand-border rounded-full overflow-hidden">
         <motion.div
-          className="h-full bg-gradient-to-r from-accent-purple to-accent-blue rounded-full"
+          className="h-full progress-bar-fill rounded-full"
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
           transition={{ duration: 0.3 }}
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * PR-07.1: Banner for inferred business name
+ */
+function InferredNameBanner({
+  name,
+  source,
+  onEdit,
+}: {
+  name: string;
+  source?: string;
+  onEdit: () => void;
+}) {
+  const sourceText = source === "scraped"
+    ? "from your website"
+    : source === "llm"
+    ? "from your description"
+    : "automatically";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-2xl mx-auto mb-6 p-4 rounded-xl bg-brand-surface border border-brand-border"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-brand-accent/10 flex items-center justify-center">
+            <svg
+              className="w-4 h-4 text-brand-accent"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+              />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm text-text-secondary">
+              We identified your business as
+            </p>
+            <p className="font-medium text-text-primary">{name}</p>
+            <p className="text-xs text-text-muted mt-0.5">
+              Inferred {sourceText}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="text-sm text-brand-accent hover:underline"
+        >
+          Edit
+        </button>
+      </div>
+    </motion.div>
   );
 }
 
@@ -175,14 +247,14 @@ function CompletionScreen({
         </div>
       </div>
 
-      {/* CTA */}
+      {/* CTA - PR-07.1: Uses global btn-primary (black) */}
       <motion.button
         type="button"
         onClick={onCreateWebsite}
         disabled={loading}
         whileHover={{ scale: loading ? 1 : 1.02 }}
         whileTap={{ scale: loading ? 1 : 0.98 }}
-        className="w-full sm:w-auto px-8 py-4 bg-accent-purple text-white rounded-xl font-medium text-lg hover:bg-accent-purple/90 shadow-lg shadow-accent-purple/30 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="btn-primary w-full sm:w-auto px-8 py-4 text-lg shadow-lg"
       >
         {loading ? (
           <span className="flex items-center justify-center gap-2">
@@ -227,11 +299,32 @@ export default function GuidedIntakeView({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [editingName, setEditingName] = useState(false);
 
-  const questions = INTAKE_QUESTIONS;
+  // PR-07.1: Filter questions - skip business name if user-provided
+  const questions = useMemo(() => getActiveQuestions(INTAKE_QUESTIONS, state), [state]);
   const currentQuestion = questions[currentIndex];
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === questions.length - 1;
+
+  // PR-07.1: Check if we should show inferred name banner
+  const inferredNameMeta = useMemo(() => getInferredValueWithMeta(state, "project_name"), [state]);
+  const hasUserName = useMemo(() => hasUserProvidedValue(state, "project_name"), [state]);
+  const showInferredNameBanner = Boolean(inferredNameMeta?.value) && !hasUserName && !editingName;
+
+  // PR-07.1: Get user override value for current question (for priority options)
+  const getUserOverrideValue = useCallback((field: string): string | undefined => {
+    const overrides = state.project_meta?.user_overrides ?? {};
+    const value = overrides[field];
+    return typeof value === "string" ? value : undefined;
+  }, [state]);
+
+  // PR-07.1: Get inferred value for current question (for priority options)
+  const getInferredValue = useCallback((field: string): string | undefined => {
+    const inferred = state.project_meta?.inferred ?? {};
+    const entry = inferred[field];
+    return entry && typeof entry.value === "string" ? entry.value : undefined;
+  }, [state]);
 
   // Get current value for the question
   const getCurrentValue = useCallback(() => {
@@ -334,6 +427,15 @@ export default function GuidedIntakeView({
 
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-8">
+        {/* Inferred name banner */}
+        {!completed && showInferredNameBanner && inferredNameMeta && (
+          <InferredNameBanner
+            name={String(inferredNameMeta?.value)}
+            source={inferredNameMeta?.source}
+            onEdit={() => setEditingName(true)}
+          />
+        )}
+
         {!completed && <ProgressBar current={currentIndex} total={questions.length} />}
 
         <AnimatePresence mode="wait">
@@ -344,6 +446,83 @@ export default function GuidedIntakeView({
               onCreateWebsite={onCreateWebsite}
               loading={saving}
             />
+          ) : editingName ? (
+            // PR-07.1: Inline name editor when user clicks "Edit" on banner
+            <motion.div
+              key="name-editor"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="w-full max-w-2xl mx-auto"
+            >
+              <div className="text-center mb-8">
+                <h2 className="text-2xl sm:text-3xl font-semibold text-text-primary mb-2">
+                  Update your business name
+                </h2>
+                <p className="text-text-secondary">Enter the correct name for your business</p>
+              </div>
+              <input
+                type="text"
+                defaultValue={String(inferredNameMeta?.value || state.project_name || "")}
+                className="w-full bg-brand-surface border border-brand-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-accent text-lg mb-6"
+                autoFocus
+                onKeyDown={async (e) => {
+                  if (e.key === "Enter") {
+                    const newName = (e.target as HTMLInputElement).value.trim();
+                    if (newName) {
+                      setSaving(true);
+                      try {
+                        await updateProject({
+                          project_name: newName,
+                          project_meta: { user_overrides: { project_name: newName } },
+                        });
+                        const freshState = await getProjectState();
+                        onStateUpdated(freshState as WebsiteState);
+                      } catch (err) {
+                        console.error("[Intake] Failed to update name:", err);
+                      }
+                      setSaving(false);
+                      setEditingName(false);
+                    }
+                  }
+                }}
+              />
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setEditingName(false)}
+                  className="text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const input = document.querySelector("input") as HTMLInputElement;
+                    const newName = input?.value.trim();
+                    if (newName) {
+                      setSaving(true);
+                      try {
+                        await updateProject({
+                          project_name: newName,
+                          project_meta: { user_overrides: { project_name: newName } },
+                        });
+                        const freshState = await getProjectState();
+                        onStateUpdated(freshState as WebsiteState);
+                      } catch (err) {
+                        console.error("[Intake] Failed to update name:", err);
+                      }
+                      setSaving(false);
+                      setEditingName(false);
+                    }
+                  }}
+                  disabled={saving}
+                  className="btn-primary"
+                >
+                  {saving ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </motion.div>
           ) : currentQuestion ? (
             <QuestionCard
               key={currentQuestion.id}
@@ -355,6 +534,9 @@ export default function GuidedIntakeView({
               isFirst={isFirst}
               isLast={isLast}
               loading={saving}
+              // PR-07.1: Pass priority option info
+              userOverrideValue={getUserOverrideValue(currentQuestion.field)}
+              inferredValue={getInferredValue(currentQuestion.field)}
             />
           ) : null}
         </AnimatePresence>

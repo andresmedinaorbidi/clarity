@@ -1,16 +1,21 @@
 "use client";
 /**
- * FontPicker - Typography pairing selector (PR-07)
+ * FontPicker - Typography pairing selector (PR-07, PR-07.1)
+ *
+ * PR-07.1 Updates:
+ * - Accepts priorityMeta for displaying "Recommended" / "From your description" badges
+ * - Uses brand accent for priority highlighting
  */
 
 import React from "react";
 import { motion } from "framer-motion";
-import type { QuestionOption } from "../../intakeQuestions";
+import type { QuestionOption, PriorityOptionMeta } from "../../intakeQuestions";
 
 interface FontPickerProps {
   options: QuestionOption[];
   value: string | undefined;
   onChange: (value: string) => void;
+  priorityMeta?: PriorityOptionMeta[];
 }
 
 /**
@@ -51,11 +56,22 @@ export default function FontPicker({
   options,
   value,
   onChange,
+  priorityMeta,
 }: FontPickerProps) {
+  // PR-07.1: Helper to find priority info for an option
+  const getPriorityInfo = (optionValue: string) => {
+    return priorityMeta?.find(
+      (m) => m.value.toLowerCase() === optionValue.toLowerCase()
+    );
+  };
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
       {options.map((option) => {
-        const isSelected = value === option.value;
+        const isSelected = value?.toLowerCase() === option.value.toLowerCase();
+        const priorityInfo = getPriorityInfo(option.value);
+        const isPriority = !!priorityInfo;
+
         return (
           <motion.button
             key={option.value}
@@ -68,17 +84,37 @@ export default function FontPicker({
               border-2
               ${
                 isSelected
-                  ? "border-accent-purple bg-accent-purple/10 shadow-lg shadow-accent-purple/20"
-                  : "border-border-subtle bg-surface-dark/50 hover:border-border-default"
+                  ? "border-brand-accent bg-brand-accent/10 shadow-lg"
+                  : isPriority
+                  ? "border-brand-accent/30 bg-brand-surface hover:border-brand-accent/50"
+                  : "border-brand-border bg-brand-surface hover:border-text-muted"
               }
             `}
           >
+            {/* PR-07.1: Priority badge */}
+            {priorityInfo && (
+              <div className="absolute -top-2 left-2 z-10">
+                <span
+                  className={
+                    priorityInfo.type === "user" ? "badge-user" : "badge-ai"
+                  }
+                >
+                  {priorityInfo.type === "inferred" && (
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  )}
+                  {priorityInfo.label}
+                </span>
+              </div>
+            )}
+
             {/* Selection indicator */}
             {isSelected && (
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="absolute -top-2 -right-2 w-5 h-5 bg-accent-purple rounded-full flex items-center justify-center"
+                className="absolute -top-2 -right-2 w-5 h-5 bg-brand-accent rounded-full flex items-center justify-center z-10"
               >
                 <svg
                   className="w-3 h-3 text-white"
@@ -97,7 +133,7 @@ export default function FontPicker({
             )}
 
             {/* Preview */}
-            <div className="mb-2">
+            <div className="mb-2 mt-1">
               <FontPreview fontPair={option.value} />
             </div>
 

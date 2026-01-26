@@ -161,6 +161,25 @@ export async function sendChatMessage(message: string): Promise<Response> {
 }
 
 /**
+ * Run the enrichment agent to populate inferred values.
+ * PR-07.1b: Called after hero submission to pre-fill intake questions.
+ */
+export async function enrichProject(
+  seedText: string,
+  websiteUrl?: string
+): Promise<{ message: string; state: unknown }> {
+  const response = await fetch(`${API_URL}/enrich`, {
+    method: "POST",
+    headers: getSessionHeaders(),
+    body: JSON.stringify({
+      seed_text: seedText,
+      website_url: websiteUrl,
+    }),
+  });
+  return handleResponse(response);
+}
+
+/**
  * Create a new session explicitly (useful for "New Project" button).
  */
 export async function createNewSession(): Promise<{ session_id: string }> {

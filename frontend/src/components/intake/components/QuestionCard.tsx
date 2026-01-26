@@ -1,17 +1,23 @@
 "use client";
 /**
- * QuestionCard - Wrapper for intake questions (PR-07)
+ * QuestionCard - Wrapper for intake questions (PR-07, PR-07.1)
  *
  * Displays one question at a time with:
  * - Title and description
  * - Picker or text input
  * - "Type instead" toggle
  * - Navigation buttons
+ *
+ * PR-07.1 Updates:
+ * - Accepts userOverrideValue and inferredValue for priority options
+ * - Buttons use global .btn-primary class (black)
+ * - Passes priority info to pickers
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { IntakeQuestion, QuestionOption } from "../intakeQuestions";
+import { buildPriorityOptions } from "../intakeQuestions";
 import SingleSelectChips from "./pickers/SingleSelectChips";
 import MultiSelectChips from "./pickers/MultiSelectChips";
 import ColorPicker from "./pickers/ColorPicker";
@@ -27,6 +33,9 @@ interface QuestionCardProps {
   isFirst?: boolean;
   isLast?: boolean;
   loading?: boolean;
+  // PR-07.1: Priority option props
+  userOverrideValue?: string;
+  inferredValue?: string;
 }
 
 export default function QuestionCard({
@@ -38,21 +47,36 @@ export default function QuestionCard({
   isFirst = false,
   isLast = false,
   loading = false,
+  userOverrideValue,
+  inferredValue,
 }: QuestionCardProps) {
   // Local state for the current answer
   const [value, setValue] = useState<unknown>(currentValue);
   const [isTyping, setIsTyping] = useState(false);
   const [textValue, setTextValue] = useState("");
 
-  // Sync with external value changes
+  // PR-07.1: Build priority options with user/inferred values injected
+  const priorityResult = useMemo(() => {
+    if (!question.options) return null;
+    return buildPriorityOptions(
+      question.options,
+      userOverrideValue,
+      inferredValue,
+      currentValue
+    );
+  }, [question.options, userOverrideValue, inferredValue, currentValue]);
+
+  // Sync with external value changes (PR-07.1: also consider priority selection)
   useEffect(() => {
-    setValue(currentValue);
-    if (typeof currentValue === "string") {
-      setTextValue(currentValue);
-    } else if (Array.isArray(currentValue)) {
-      setTextValue(currentValue.join(", "));
+    // Use priority-selected value if no current value
+    const effectiveValue = currentValue ?? priorityResult?.selectedValue;
+    setValue(effectiveValue);
+    if (typeof effectiveValue === "string") {
+      setTextValue(effectiveValue);
+    } else if (Array.isArray(effectiveValue)) {
+      setTextValue(effectiveValue.join(", "));
     }
-  }, [currentValue]);
+  }, [currentValue, priorityResult?.selectedValue]);
 
   // Check if we can proceed
   const canProceed = () => {
@@ -137,9 +161,10 @@ export default function QuestionCard({
       case "single":
         return (
           <SingleSelectChips
-            options={question.options || []}
-            value={typeof value === "string" ? value : undefined}
+            options={priorityResult?.options || question.options || []}
+            value={typeof value === "string" ? value : priorityResult?.selectedValue}
             onChange={(v) => setValue(v)}
+            priorityMeta={priorityResult?.priorityMeta}
           />
         );
 
@@ -163,18 +188,20 @@ export default function QuestionCard({
       case "style":
         return (
           <StyleChooser
-            options={question.options || []}
-            value={typeof value === "string" ? value : undefined}
+            options={priorityResult?.options || question.options || []}
+            value={typeof value === "string" ? value : priorityResult?.selectedValue}
             onChange={(v) => setValue(v)}
+            priorityMeta={priorityResult?.priorityMeta}
           />
         );
 
       case "fonts":
         return (
           <FontPicker
-            options={question.options || []}
-            value={typeof value === "string" ? value : undefined}
+            options={priorityResult?.options || question.options || []}
+            value={typeof value === "string" ? value : priorityResult?.selectedValue}
             onChange={(v) => setValue(v)}
+            priorityMeta={priorityResult?.priorityMeta}
           />
         );
 
@@ -241,21 +268,14 @@ export default function QuestionCard({
           <div />
         )}
 
-        {/* Next/Submit button */}
+        {/* Next/Submit button - PR-07.1: Uses global btn-primary (black) */}
         <motion.button
           type="button"
           onClick={handleSubmit}
           disabled={!canProceed() || loading}
           whileHover={{ scale: canProceed() && !loading ? 1.02 : 1 }}
           whileTap={{ scale: canProceed() && !loading ? 0.98 : 1 }}
-          className={`
-            px-8 py-3 rounded-xl font-medium transition-all
-            ${
-              canProceed() && !loading
-                ? "bg-accent-purple text-white hover:bg-accent-purple/90 shadow-lg shadow-accent-purple/30"
-                : "bg-surface-dark text-text-muted cursor-not-allowed"
-            }
-          `}
+          className="btn-primary"
         >
           {loading ? (
             <span className="flex items-center gap-2">

@@ -171,6 +171,8 @@ class SkillRegistry:
         ))
 
         # PLANNING SKILL: Sitemap Generation
+        # PR-07.1: Removed requires_approval gate - new guided intake flow handles approval
+        # at intake completion stage when user clicks "Create Website"
         self.register(Skill(
             id="planning",
             name="Sitemap Architect",
@@ -180,7 +182,7 @@ class SkillRegistry:
             can_invoke_directly=True,
             suggested_next="seo",
             phase_order=4,
-            requires_approval=True,  # GATE 1: Stop for user approval
+            requires_approval=False,  # PR-07.1: Removed gate - continues to build automatically
             revision_supported=True,
             auto_execute=True,  # Auto-runs after UX
             icon="🏗️",
