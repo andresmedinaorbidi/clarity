@@ -233,3 +233,149 @@ body {
 .shadow-premium-hover {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
 }
+
+/* ============================================================================
+   HeroSection Premium Upgrade: Visual System
+   ============================================================================ */
+
+/* Hero Gradient Background - Organic gradient blobs */
+.hero-gradient-bg {
+  position: relative;
+  background: linear-gradient(
+    180deg,
+    rgba(96, 37, 159, 0.08) 0%,
+    #fafafa 30%,
+    #fafafa 70%,
+    rgba(190, 255, 80, 0.06) 100%
+  );
+  overflow: hidden;
+}
+
+.hero-gradient-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 80%;
+  height: 80%;
+  background: radial-gradient(circle, rgba(96, 37, 159, 0.3) 0%, rgba(96, 37, 159, 0.15) 40%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(120px);
+  pointer-events: none;
+  animation: gradient-drift-purple 25s ease-in-out infinite;
+}
+
+.hero-gradient-bg::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 70%;
+  height: 70%;
+  background: radial-gradient(circle, rgba(190, 255, 80, 0.25) 0%, rgba(190, 255, 80, 0.12) 40%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(150px);
+  pointer-events: none;
+  animation: gradient-drift-green 30s ease-in-out infinite;
+}
+
+@keyframes gradient-drift-purple {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(5%, -5%) scale(1.1); }
+  66% { transform: translate(-5%, 5%) scale(0.95); }
+}
+
+@keyframes gradient-drift-green {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-5%, 5%) scale(1.15); }
+}
+
+/* Noise Texture - Film Grain Overlay */
+.noise-texture {
+  position: relative;
+}
+
+.noise-texture::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Input Field Enhancements - Green as Signal */
+.input-glow-focus {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.input-glow-focus:focus {
+  box-shadow: 
+    0 0 0 3px rgba(190, 255, 80, 0.25),
+    0 4px 20px rgba(190, 255, 80, 0.15),
+    0 0 40px rgba(190, 255, 80, 0.1);
+  border-color: rgba(190, 255, 80, 0.5);
+}
+
+.input-glow-focus::placeholder {
+  color: var(--text-muted);
+}
+
+/* Custom cursor color for input */
+.input-glow-focus {
+  caret-color: #beff50;
+}
+
+/* Button Cursor Attraction Effect */
+.btn-cursor-attract {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.btn-cursor-attract:hover {
+  box-shadow: 
+    0 0 0 4px rgba(190, 255, 80, 0.3),
+    0 8px 24px rgba(190, 255, 80, 0.2),
+    0 0 60px rgba(190, 255, 80, 0.15);
+  transform: scale(1.02);
+}
+
+/* Data Source Icons Animation */
+.data-source-icons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.data-source-icons:hover {
+  opacity: 1;
+}
+
+.data-source-icon {
+  animation: icon-float 3s ease-in-out infinite;
+}
+
+.data-source-icon:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.data-source-icon:nth-child(2) {
+  animation-delay: 1s;
+}
+
+.data-source-icon:nth-child(3) {
+  animation-delay: 2s;
+}
+
+@keyframes icon-float {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
+  50% { transform: translateY(-4px) scale(1.05); opacity: 1; }
+}
