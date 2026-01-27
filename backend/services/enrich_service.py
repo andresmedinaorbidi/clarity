@@ -19,6 +19,8 @@ from typing import Optional, Dict, Any, Tuple
 from state_schema import WebsiteState
 from utils import get_filled_prompt, ask_gemini
 from services.scraper_service import scrape_website
+from services.field_mapper import map_to_closest_option
+from services.visual_generator import generate_field_visuals
 
 
 def _coerce_confidence(value: Any) -> float:
@@ -122,6 +124,10 @@ def _ensure_project_meta_structure(state: WebsiteState) -> None:
         state.project_meta["inferred"] = {}
     if "user_overrides" not in state.project_meta:
         state.project_meta["user_overrides"] = {}
+    if "field_mappings" not in state.project_meta:
+        state.project_meta["field_mappings"] = {}
+    if "field_visuals" not in state.project_meta:
+        state.project_meta["field_visuals"] = {}
 
     # additional_context structure
     if not isinstance(state.additional_context, dict):
@@ -183,9 +189,63 @@ def _run_llm_inference(
         return None
 
 
+def _get_predefined_options_for_field(field_name: str) -> Optional[list]:
+    """Returns predefined options for a field that can be mapped."""
+    # These match the frontend intakeQuestions.ts options
+    options_map = {
+        "industry": [
+            {"value": "technology", "label": "Technology", "description": "Software, SaaS, IT services"},
+            {"value": "ecommerce", "label": "E-commerce", "description": "Online retail, marketplaces"},
+            {"value": "healthcare", "label": "Healthcare", "description": "Medical, wellness, fitness"},
+            {"value": "finance", "label": "Finance", "description": "Banking, fintech, insurance"},
+            {"value": "education", "label": "Education", "description": "Schools, courses, e-learning"},
+            {"value": "restaurant", "label": "Restaurant", "description": "Food service, cafes, bars"},
+            {"value": "real_estate", "label": "Real Estate", "description": "Properties, agencies"},
+            {"value": "professional_services", "label": "Professional Services", "description": "Legal, consulting, agencies"},
+            {"value": "creative", "label": "Creative", "description": "Design, photography, art"},
+            {"value": "nonprofit", "label": "Nonprofit", "description": "Charities, foundations"},
+            {"value": "other", "label": "Other", "description": "Something else"},
+        ],
+        "tone": [
+            {"value": "professional", "label": "Professional", "description": "Formal and business-like"},
+            {"value": "friendly", "label": "Friendly", "description": "Warm and approachable"},
+            {"value": "casual", "label": "Casual", "description": "Relaxed and conversational"},
+            {"value": "authoritative", "label": "Authoritative", "description": "Expert and confident"},
+            {"value": "playful", "label": "Playful", "description": "Fun and lighthearted"},
+            {"value": "inspirational", "label": "Inspirational", "description": "Motivating and uplifting"},
+        ],
+        "design_style": [
+            {"value": "minimal", "label": "Minimal", "description": "Clean, simple, lots of whitespace"},
+            {"value": "modern", "label": "Modern", "description": "Contemporary, bold typography"},
+            {"value": "elegant", "label": "Elegant", "description": "Refined, sophisticated, premium feel"},
+            {"value": "playful", "label": "Playful", "description": "Fun, colorful, friendly"},
+            {"value": "corporate", "label": "Corporate", "description": "Professional, trustworthy, formal"},
+            {"value": "bold", "label": "Bold", "description": "Strong contrasts, impactful"},
+        ],
+        "goal": [
+            {"value": "lead_generation", "label": "Generate Leads", "description": "Capture contact info and inquiries"},
+            {"value": "sell_products", "label": "Sell Products", "description": "E-commerce and online sales"},
+            {"value": "build_brand", "label": "Build Brand", "description": "Establish presence and credibility"},
+            {"value": "inform", "label": "Inform Visitors", "description": "Share information and resources"},
+            {"value": "portfolio", "label": "Showcase Work", "description": "Display projects and case studies"},
+            {"value": "booking", "label": "Take Bookings", "description": "Schedule appointments or reservations"},
+        ],
+        "font_pair": [
+            {"value": "inter_playfair", "label": "Inter + Playfair", "description": "Modern sans + classic serif"},
+            {"value": "poppins_lora", "label": "Poppins + Lora", "description": "Geometric + elegant"},
+            {"value": "roboto_roboto_slab", "label": "Roboto + Roboto Slab", "description": "Clean + structured"},
+            {"value": "montserrat_merriweather", "label": "Montserrat + Merriweather", "description": "Bold + readable"},
+            {"value": "open_sans_oswald", "label": "Open Sans + Oswald", "description": "Friendly + impactful"},
+            {"value": "system", "label": "System Fonts", "description": "Fast loading, native feel"},
+        ],
+    }
+    return options_map.get(field_name)
+
+
 def _merge_inferred_values(state: WebsiteState, inferred: Dict[str, Any]) -> None:
     """
     Merge inferred values into state with confidence-based upgrade rules (PR-05).
+    Enhanced with field mapping and visual generation.
 
     Algorithm:
     1) For each field in inferred payload:
@@ -193,6 +253,8 @@ def _merge_inferred_values(state: WebsiteState, inferred: Dict[str, Any]) -> Non
        - ACCEPT if: field doesn't exist OR new_conf > old_conf (strictly greater)
     2) If ACCEPT:
        - Store in project_meta["inferred"]
+       - Attempt AI mapping to predefined options (if available)
+       - Generate visuals for unmatched values
        - Update active field ONLY if NOT in user_overrides
     3) If REJECT:
        - Keep existing inferred value
@@ -202,11 +264,18 @@ def _merge_inferred_values(state: WebsiteState, inferred: Dict[str, Any]) -> Non
     """
     user_overrides = state.project_meta.get("user_overrides", {})
     existing_inferred = state.project_meta.get("inferred", {})
+    field_mappings = state.project_meta.get("field_mappings", {})
+    field_visuals = state.project_meta.get("field_visuals", {})
 
     # Counters for logging
     accepted_count = 0
     upgraded_count = 0
     kept_count = 0
+    mapped_count = 0
+    visual_generated_count = 0
+
+    # Build context for mapping/visual generation
+    context = f"Business: {state.project_name}, Industry: {state.industry}"
 
     for field_name, new_data in inferred.items():
         # Normalize new data structure
@@ -255,36 +324,110 @@ def _merge_inferred_values(state: WebsiteState, inferred: Dict[str, Any]) -> Non
         }
 
         # ─────────────────────────────────────────────────────────────────────
+        # Attempt AI mapping to predefined options (if field has options)
+        # ─────────────────────────────────────────────────────────────────────
+        if isinstance(new_value, str) and new_value.strip():
+            predefined_options = _get_predefined_options_for_field(field_name)
+            if predefined_options:
+                # Check if value already matches a predefined option
+                value_lower = new_value.lower().strip()
+                exact_match = None
+                for opt in predefined_options:
+                    if opt.get("value", "").lower() == value_lower or opt.get("label", "").lower() == value_lower:
+                        exact_match = opt["value"]
+                        break
+                
+                if exact_match:
+                    # Exact match found, store mapping with high confidence
+                    field_mappings[field_name] = {
+                        "original_value": new_value,
+                        "mapped_value": exact_match,
+                        "confidence": 1.0,
+                        "rationale": "Exact match to predefined option"
+                    }
+                    mapped_count += 1
+                    print(f"[Enrich] Exact match for '{field_name}': '{new_value}' → '{exact_match}'")
+                else:
+                    # Attempt AI mapping
+                    try:
+                        mapping_result = map_to_closest_option(
+                            field_name, new_value, predefined_options, context
+                        )
+                        if mapping_result.get("mapped_value") and mapping_result.get("confidence", 0) >= 0.7:
+                            field_mappings[field_name] = mapping_result
+                            mapped_count += 1
+                            print(f"[Enrich] Mapped '{field_name}': '{new_value}' → '{mapping_result['mapped_value']}' (conf={mapping_result['confidence']:.2f})")
+                        else:
+                            # No good mapping, generate visuals for unmatched value
+                            try:
+                                visuals = generate_field_visuals(field_name, new_value, field_name, context)
+                                field_visuals[field_name] = visuals
+                                visual_generated_count += 1
+                                print(f"[Enrich] Generated visuals for unmatched '{field_name}': '{new_value}'")
+                            except Exception as e:
+                                print(f"[Enrich] Visual generation failed for '{field_name}': {str(e)}")
+                    except Exception as e:
+                        print(f"[Enrich] Mapping failed for '{field_name}': {str(e)}")
+                        # Fallback: generate visuals
+                        try:
+                            visuals = generate_field_visuals(field_name, new_value, field_name, context)
+                            field_visuals[field_name] = visuals
+                            visual_generated_count += 1
+                        except Exception as ve:
+                            print(f"[Enrich] Visual generation also failed: {str(ve)}")
+            else:
+                # Field has no predefined options, generate visuals directly
+                if isinstance(new_value, str) and new_value.strip():
+                    try:
+                        visuals = generate_field_visuals(field_name, new_value, field_name, context)
+                        field_visuals[field_name] = visuals
+                        visual_generated_count += 1
+                    except Exception as e:
+                        print(f"[Enrich] Visual generation failed for '{field_name}': {str(e)}")
+
+        # Store mappings and visuals back to state
+        state.project_meta["field_mappings"] = field_mappings
+        state.project_meta["field_visuals"] = field_visuals
+
+        # ─────────────────────────────────────────────────────────────────────
         # Update active field ONLY if NOT overridden by user
+        # Use mapped value if available, otherwise use original
         # ─────────────────────────────────────────────────────────────────────
         if field_name in user_overrides:
             print(f"[Enrich] Field '{field_name}' is user-overridden, skipping active update")
             continue
 
+        # Determine which value to use: mapped value (if high confidence) or original
+        value_to_use = new_value
+        if field_name in field_mappings:
+            mapping = field_mappings[field_name]
+            if mapping.get("mapped_value") and mapping.get("confidence", 0) >= 0.7:
+                value_to_use = mapping["mapped_value"]
+
         # Update active fields based on field name
-        if field_name == "industry" and new_value:
-            state.industry = str(new_value)
+        if field_name == "industry" and value_to_use:
+            state.industry = str(value_to_use)
 
-        elif field_name == "design_style" and new_value:
-            state.design_style = str(new_value)
+        elif field_name == "design_style" and value_to_use:
+            state.design_style = str(value_to_use)
 
-        elif field_name == "brand_colors" and new_value:
-            if isinstance(new_value, list):
-                state.brand_colors = [str(c) for c in new_value]
-            elif isinstance(new_value, str):
+        elif field_name == "brand_colors" and value_to_use:
+            if isinstance(value_to_use, list):
+                state.brand_colors = [str(c) for c in value_to_use]
+            elif isinstance(value_to_use, str):
                 # Handle comma-separated string
-                state.brand_colors = [c.strip() for c in new_value.split(",")]
+                state.brand_colors = [c.strip() for c in value_to_use.split(",")]
 
-        elif field_name == "draft_pages" and new_value:
+        elif field_name == "draft_pages" and value_to_use:
             # Store in additional_context, not as active field
             # Also check if draft_pages is overridden
             if "draft_pages" not in user_overrides:
-                if isinstance(new_value, list):
-                    state.additional_context["draft_pages"] = list(new_value)
+                if isinstance(value_to_use, list):
+                    state.additional_context["draft_pages"] = list(value_to_use)
 
-        elif field_name == "tone" and new_value:
+        elif field_name == "tone" and value_to_use:
             # Store tone in project_meta for later use (not an active field)
-            state.project_meta["tone"] = str(new_value)
+            state.project_meta["tone"] = str(value_to_use)
 
     # Log summary
-    state.logs.append(f"Enrich: Merged {accepted_count} new, {upgraded_count} upgraded, {kept_count} kept")
+    state.logs.append(f"Enrich: Merged {accepted_count} new, {upgraded_count} upgraded, {kept_count} kept, {mapped_count} mapped, {visual_generated_count} visuals generated")

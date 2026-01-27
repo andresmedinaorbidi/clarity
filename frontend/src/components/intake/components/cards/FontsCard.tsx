@@ -10,7 +10,8 @@ import type { WebsiteState } from "@/hooks/use-orchestrator";
 import { updateProject, getProjectState } from "@/lib/api";
 import type { SourceType } from "../SourceBadge";
 import FontPicker from "../pickers/FontPicker";
-import { Type } from "lucide-react";
+import { Type, Book } from "lucide-react";
+import { getFieldVisuals, renderCustomFieldDisplay } from "../visualHelpers";
 
 // Font pair mapping
 const fontMap: Record<string, { heading: string; body: string; headingFamily: string; bodyFamily: string }> = {
@@ -76,9 +77,11 @@ export default function FontsCard({
       FONT_OPTIONS,
       userOverrideValue,
       inferredValue,
-      currentValue
+      currentValue,
+      state,
+      "font_pair"
     );
-  }, [userOverrideValue, inferredValue, currentValue]);
+  }, [userOverrideValue, inferredValue, currentValue, state]);
 
   useEffect(() => {
     setValue(typeof currentValue === "string" ? currentValue : priorityResult?.selectedValue);
@@ -114,40 +117,71 @@ export default function FontsCard({
   };
 
   // Get font info for display
+  const fontValue = typeof currentValue === "string" ? currentValue : "";
   const fontInfo = useMemo(() => {
-    const fontValue = typeof currentValue === "string" ? currentValue : "";
     return fontMap[fontValue] || null;
-  }, [currentValue]);
+  }, [fontValue]);
 
-  const displayValue = fontInfo ? (
-    <div className="space-y-4">
-      {/* Display Font Section */}
-      <div>
-        <p className="text-xs font-medium text-text-muted mb-2">Display Font</p>
-        <p
-          className="text-2xl font-bold text-text-primary mb-1"
-          style={{ 
-            fontFamily: fontInfo.headingFamily,
-            fontStyle: fontInfo.headingFamily.includes('serif') ? 'italic' : 'normal'
-          }}
-        >
-          {fontInfo.heading}
-        </p>
-        <p className="text-sm text-text-muted">{fontInfo.heading}</p>
-      </div>
+  // Check for generated visuals if no predefined font
+  const generatedVisuals = useMemo(() => {
+    if (!fontValue || fontInfo) return null;
+    return getFieldVisuals("font_pair", fontValue, state);
+  }, [fontValue, fontInfo, state]);
 
-      {/* Body Font Section */}
-      <div>
-        <p className="text-xs font-medium text-text-muted mb-2">Body Font</p>
-        <p
-          className="text-base text-text-primary mb-1"
-          style={{ fontFamily: fontInfo.bodyFamily }}
-        >
-          {fontInfo.body}
-        </p>
-        <p className="text-sm text-text-muted">{fontInfo.body}</p>
+  const displayValue = fontValue ? (
+    fontInfo ? (
+      <div className="space-y-4">
+        {/* Display Font Section */}
+        <div>
+          <p className="text-xs font-medium text-text-muted mb-2">Display Font</p>
+          <p
+            className="text-2xl font-bold text-text-primary mb-1"
+            style={{ 
+              fontFamily: fontInfo.headingFamily,
+              fontStyle: fontInfo.headingFamily.includes('serif') ? 'italic' : 'normal'
+            }}
+          >
+            {fontInfo.heading}
+          </p>
+          <p className="text-sm text-text-muted">{fontInfo.heading}</p>
+        </div>
+
+        {/* Body Font Section */}
+        <div>
+          <p className="text-xs font-medium text-text-muted mb-2">Body Font</p>
+          <p
+            className="text-base text-text-primary mb-1"
+            style={{ fontFamily: fontInfo.bodyFamily }}
+          >
+            {fontInfo.body}
+          </p>
+          <p className="text-sm text-text-muted">{fontInfo.body}</p>
+        </div>
       </div>
-    </div>
+    ) : generatedVisuals ? (
+      <div className="space-y-3">
+        {renderCustomFieldDisplay(fontValue, generatedVisuals, FONT_OPTIONS.find(opt => opt.value === fontValue)?.label || fontValue)}
+        <p className="text-xs text-text-muted mt-2">Custom font pairing</p>
+      </div>
+    ) : (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ 
+              backgroundColor: "#6B728015",
+              color: "#6B7280"
+            }}
+          >
+            <Book size={24} style={{ color: "#6B7280" }} />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-text-primary">{fontValue}</p>
+            <p className="text-sm text-text-muted">Custom font pairing</p>
+          </div>
+        </div>
+      </div>
+    )
   ) : (
     <p className="text-text-muted italic text-sm">Select font pairing</p>
   );

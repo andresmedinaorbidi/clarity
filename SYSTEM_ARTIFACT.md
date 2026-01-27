@@ -74,7 +74,9 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 │   │   ├── __init__.py         # Package exports
 │   │   ├── mock_crm.py         # Mock CRM integrations (moved from services.py)
 │   │   ├── scraper_service.py  # PR-03: Lightweight website scraper
-│   │   └── enrich_service.py   # PR-03: Enrichment orchestration
+│   │   ├── enrich_service.py   # PR-03: Enrichment orchestration (enhanced with mapping/visuals)
+│   │   ├── field_mapper.py     # AI-powered field value mapping to predefined options
+│   │   └── visual_generator.py # AI-powered visual generation for unmatched values
 │   ├── main.py                 # FastAPI server entry point
 │   ├── state_schema.py         # WebsiteState Pydantic model (PR-02: InferredField)
 │   ├── database.py             # SQLAlchemy session persistence
@@ -111,6 +113,7 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
     │   │   │   │   └── PagesCard.tsx
     │   │   │   ├── SourceBadge.tsx       # Data source indicator badge
     │   │   │   ├── FieldCard.tsx         # Base card wrapper component
+    │   │   │   ├── visualHelpers.ts      # Visual retrieval utilities for unmatched values
     │   │   │   └── pickers/              # UI pickers (SingleSelectChips, ColorPicker, etc.)
     │   ├── hooks/
     │   │   └── use-orchestrator.ts  # State management & streaming API client
@@ -148,7 +151,7 @@ The app uses a linear full-screen UX flow post-hero:
 
 **Magical Intake (Current):**
 
-MagicalIntakeView displays all business information at once in a structured 2-column premium card layout:
+MagicalIntakeView displays all business information at once in a structured 2-column premium card layout with intelligent field mapping and dynamic visual generation:
 - **Layout**: Two-column grid (1 column mobile → 2 columns desktop)
   - Left column: Brand Colors, Typography, Style (Brand Identity section)
   - Right column: Industry, Goal, Brand Tone, Pages (Business Details section)
@@ -170,6 +173,9 @@ MagicalIntakeView displays all business information at once in a structured 2-co
 - **Inline Editing**: Click edit icon on any card to modify field inline
 - **Field Value Priority**: `user_overrides` > `inferred` > top-level state > empty
 - **Persistence**: Calls `/update-project` with field value and `project_meta.user_overrides`
+- **Smart Field Mapping**: AI-powered mapping of inferred/scraped values to predefined options when confidence is high (>0.7)
+- **Dynamic Visual Generation**: AI-generated visuals (icon, color, characteristics) for unmatched values that don't fit predefined options
+- **Unmatched Value Display**: All inferred/scraped/user values are visible in UI, even if they don't match predefined options, with generated visuals
 - **Special Pickers**: 
   - Colors: Inline color palette selector (display shows grid of swatches with names/hex codes)
   - Fonts: Inline font preview grid (display shows Display Font and Body Font sections with actual font rendering)
@@ -231,10 +237,14 @@ GuidedIntakeView (step-by-step wizard) is still available but replaced by Magica
 * `source` (string - "llm", "scraped", "hybrid", "default")
 * `rationale` (string - short explanation of inference)
 
-**project_meta Structure** (PR-02):
+**project_meta Structure** (PR-02, Enhanced):
 * `project_meta["inferred"]`: Dict of field_name → InferredField-like objects (machine-suggested values)
   * Structure: `{value, confidence, source, rationale}` where source is "llm", "scraped", "hybrid", or "default"
 * `project_meta["user_overrides"]`: Dict of field_name → user-provided values (always takes precedence)
+* `project_meta["field_mappings"]`: Dict of field_name → mapping metadata (new)
+  * Structure: `{original_value, mapped_value, confidence, rationale}` - stores AI mapping results when inferred values are mapped to predefined options
+* `project_meta["field_visuals"]`: Dict of field_name → visual metadata (new)
+  * Structure: `{icon, color, characteristics}` - stores AI-generated visuals for unmatched values
 * Used by both MagicalIntakeView and GuidedIntakeView for field value resolution
 
 **Skill** (backend/agents/registry.py):
@@ -606,6 +616,43 @@ intake → research → strategy → ux → planning → seo → copywriting →
 ---
 
 ## 13. Last Updated
+
+* **Date**: 2026-01-26
+* **Author**: Smart Field Mapping and Dynamic Visual Generation
+* **Change Context**: Enhanced intake system with AI-powered field mapping and visual generation for unmatched values
+  - **Backend Enhancements**:
+    - Created `field_mapper.py` service for AI-powered mapping of inferred values to predefined options
+    - Created `visual_generator.py` service for AI-powered generation of card visuals (icon, color, characteristics)
+    - Enhanced `enrich_service.py` to use mapping and visual generation during enrichment
+    - Enhanced `research_agent.py` to map and generate visuals for research data
+    - Updated `state_schema.py` to include `field_mappings` and `field_visuals` in project_meta
+  - **Frontend Enhancements**:
+    - Created `visualHelpers.ts` with utilities for retrieving and rendering field visuals
+    - Enhanced `intakeQuestions.ts` with `getFieldVisuals()` and improved `buildPriorityOptions()` to handle mappings
+    - Updated all card components (IndustryCard, ToneCard, StyleCard, GoalCard, FontsCard) to display unmatched values with generated visuals
+    - Cards now show all inferred/scraped/user values, even if they don't match predefined options
+  - **Key Features**:
+    - Hybrid mapping strategy: AI maps values to predefined options when confidence is high (>0.7), otherwise generates custom visuals
+    - All values are visible: No more "selected but not shown" - every inferred value gets a visual representation
+    - Intelligent fallbacks: Generic visuals used if AI generation fails
+    - Backward compatible: Existing state and functionality preserved
+  - **Files Modified**:
+    - `backend/services/field_mapper.py` (new)
+    - `backend/services/visual_generator.py` (new)
+    - `backend/services/enrich_service.py`
+    - `backend/agents/research_agent.py`
+    - `backend/state_schema.py`
+    - `frontend/src/components/intake/components/visualHelpers.ts` (new)
+    - `frontend/src/components/intake/intakeQuestions.ts`
+    - `frontend/src/components/intake/components/cards/IndustryCard.tsx`
+    - `frontend/src/components/intake/components/cards/ToneCard.tsx`
+    - `frontend/src/components/intake/components/cards/StyleCard.tsx`
+    - `frontend/src/components/intake/components/cards/GoalCard.tsx`
+    - `frontend/src/components/intake/components/cards/FontsCard.tsx`
+  - **Previous**: Two-Column Layout Refinement (2026-01-26)
+* **Version**: 2.3.0
+
+---
 
 * **Date**: 2026-01-26
 * **Author**: Two-Column Layout Refinement

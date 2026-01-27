@@ -11,6 +11,7 @@ import { updateProject, getProjectState } from "@/lib/api";
 import type { SourceType } from "../SourceBadge";
 import SingleSelectChips from "../pickers/SingleSelectChips";
 import { Briefcase, Code, ShoppingCart, Heart, DollarSign, GraduationCap, Utensils, Home, Scale, Palette, HeartHandshake, LucideIcon } from "lucide-react";
+import { getFieldVisuals, renderCustomFieldDisplay } from "../visualHelpers";
 
 // Industry visual mapping
 const industryVisuals: Record<string, { icon: React.ComponentType<{ size?: number; className?: string }>; color: string; characteristics: string[] }> = {
@@ -95,9 +96,11 @@ export default function IndustryCard({
       INDUSTRY_OPTIONS,
       userOverrideValue,
       inferredValue,
-      currentValue
+      currentValue,
+      state,
+      "industry"
     );
-  }, [userOverrideValue, inferredValue, currentValue]);
+  }, [userOverrideValue, inferredValue, currentValue, state]);
 
   useEffect(() => {
     setValue(typeof currentValue === "string" ? currentValue : priorityResult?.selectedValue);
@@ -138,43 +141,70 @@ export default function IndustryCard({
   const industryValue = typeof currentValue === "string" ? currentValue : "";
   const industryLabel = INDUSTRY_OPTIONS.find((opt) => opt.value === industryValue)?.label || industryValue || "";
   const industryVisual = industryValue ? industryVisuals[industryValue] : null;
-  const IndustryIcon = industryVisual?.icon || Briefcase;
+  
+  // Check for generated visuals if no predefined visual
+  const generatedVisuals = useMemo(() => {
+    if (!industryValue || industryVisual) return null;
+    return getFieldVisuals("industry", industryValue, state, industryVisuals);
+  }, [industryValue, industryVisual, state]);
 
-  const displayValue = industryValue && industryVisual ? (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <div 
-          className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ 
-            backgroundColor: `${industryVisual.color}15`,
-            color: industryVisual.color
-          }}
-        >
-          <IndustryIcon size={24} style={{ color: industryVisual.color }} />
-        </div>
-        <div>
-          <p className="text-base font-semibold text-text-primary">{industryLabel}</p>
-          <p className="text-sm text-text-muted">
-            {INDUSTRY_OPTIONS.find((opt) => opt.value === industryValue)?.description}
-          </p>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {industryVisual.characteristics.map((char, i) => (
-          <span
-            key={i}
-            className="px-2 py-1 text-xs rounded-md"
-            style={{
-              backgroundColor: `${industryVisual.color}10`,
-              color: industryVisual.color,
-              border: `1px solid ${industryVisual.color}30`
+  const displayValue = industryValue ? (
+    industryVisual ? (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ 
+              backgroundColor: `${industryVisual.color}15`,
+              color: industryVisual.color
             }}
           >
-            {char}
-          </span>
-        ))}
+            <industryVisual.icon size={24} style={{ color: industryVisual.color }} />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-text-primary">{industryLabel}</p>
+            <p className="text-sm text-text-muted">
+              {INDUSTRY_OPTIONS.find((opt) => opt.value === industryValue)?.description}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {industryVisual.characteristics.map((char, i) => (
+            <span
+              key={i}
+              className="px-2 py-1 text-xs rounded-md"
+              style={{
+                backgroundColor: `${industryVisual.color}10`,
+                color: industryVisual.color,
+                border: `1px solid ${industryVisual.color}30`
+              }}
+            >
+              {char}
+            </span>
+          ))}
+        </div>
       </div>
-    </div>
+    ) : generatedVisuals ? (
+      renderCustomFieldDisplay(industryValue, generatedVisuals, industryLabel)
+    ) : (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ 
+              backgroundColor: "#6B728015",
+              color: "#6B7280"
+            }}
+          >
+            <Briefcase size={24} style={{ color: "#6B7280" }} />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-text-primary">{industryLabel}</p>
+            <p className="text-sm text-text-muted">Custom industry</p>
+          </div>
+        </div>
+      </div>
+    )
   ) : (
     <p className="text-text-muted italic text-sm">Select your industry</p>
   );

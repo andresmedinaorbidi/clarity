@@ -270,22 +270,51 @@ export interface PriorityOptionsResult {
 
 /**
  * PR-07.1: Build options list with user-provided and inferred values injected at top
+ * Enhanced to handle field mappings from backend
  *
  * @param defaultOptions - The default options for this question
  * @param userValue - User-provided value from overrides (highest priority)
  * @param inferredValue - AI-inferred value (secondary priority)
  * @param currentValue - Currently selected value
+ * @param state - Optional state to check for field mappings
+ * @param fieldName - Optional field name to check mappings
  * @returns Options array with priority values injected, plus metadata for UI
  */
 export function buildPriorityOptions(
   defaultOptions: QuestionOption[],
   userValue: string | undefined,
   inferredValue: string | undefined,
-  currentValue: unknown
+  currentValue: unknown,
+  state?: {
+    project_meta?: {
+      field_mappings?: Record<string, { original_value?: string; mapped_value?: string; confidence?: number }>;
+    };
+  },
+  fieldName?: string
 ): PriorityOptionsResult {
   const result: QuestionOption[] = [];
   const priorityMeta: PriorityOptionMeta[] = [];
   const existingValues = new Set(defaultOptions.map(o => o.value.toLowerCase()));
+
+  // Check for mapped value if state and fieldName provided
+  let mappedValue: string | undefined;
+  if (state && fieldName) {
+    const mappings = state.project_meta?.field_mappings || {};
+    if (fieldName in mappings) {
+      const mapping = mappings[fieldName];
+      if (mapping.mapped_value && mapping.confidence && mapping.confidence >= 0.7) {
+        mappedValue = mapping.mapped_value;
+        // If mapped value exists in defaults, prefer it
+        if (existingValues.has(mappedValue.toLowerCase())) {
+          // Mark the mapped option as inferred
+          priorityMeta.push({ value: mappedValue, type: "inferred", label: "Recommended" });
+        }
+      }
+    }
+  }
+
+  // Use mapped value if available and no user/inferred value
+  const effectiveInferredValue = inferredValue || mappedValue;
 
   // 1. Inject user-provided value at top if not in defaults
   if (userValue && !existingValues.has(userValue.toLowerCase())) {
@@ -301,29 +330,31 @@ export function buildPriorityOptions(
     priorityMeta.push({ value: userValue, type: "user", label: "From your description" });
   }
 
-  // 2. Inject inferred value at second position if different from user and not in defaults
-  if (inferredValue && inferredValue !== userValue && !existingValues.has(inferredValue.toLowerCase())) {
+  // 2. Inject inferred/mapped value at second position if different from user and not in defaults
+  if (effectiveInferredValue && effectiveInferredValue !== userValue && !existingValues.has(effectiveInferredValue.toLowerCase())) {
     result.push({
-      value: inferredValue,
-      label: inferredValue,
-      description: "AI recommendation",
+      value: effectiveInferredValue,
+      label: effectiveInferredValue,
+      description: mappedValue ? "AI mapped recommendation" : "AI recommendation",
     });
-    priorityMeta.push({ value: inferredValue, type: "inferred", label: "Recommended" });
-    existingValues.add(inferredValue.toLowerCase());
-  } else if (inferredValue && inferredValue !== userValue) {
+    priorityMeta.push({ value: effectiveInferredValue, type: "inferred", label: "Recommended" });
+    existingValues.add(effectiveInferredValue.toLowerCase());
+  } else if (effectiveInferredValue && effectiveInferredValue !== userValue) {
     // Mark existing option as inferred
-    priorityMeta.push({ value: inferredValue, type: "inferred", label: "Recommended" });
+    priorityMeta.push({ value: effectiveInferredValue, type: "inferred", label: "Recommended" });
   }
 
   // 3. Add all default options
   result.push(...defaultOptions);
 
-  // 4. Determine selected value: user > inferred > currentValue
+  // 4. Determine selected value: user > mapped > inferred > currentValue
   let selectedValue: string | undefined;
   if (userValue) {
     selectedValue = userValue;
-  } else if (inferredValue) {
-    selectedValue = inferredValue;
+  } else if (mappedValue && existingValues.has(mappedValue.toLowerCase())) {
+    selectedValue = mappedValue;
+  } else if (effectiveInferredValue) {
+    selectedValue = effectiveInferredValue;
   } else if (typeof currentValue === "string") {
     selectedValue = currentValue;
   }
@@ -377,6 +408,61 @@ export function getActiveQuestions(
     }
     return true;
   });
+}
+
+/**
+ * Get visual metadata for a field value
+ * Uses visualHelpers to retrieve visuals with proper priority
+ */
+export function getFieldVisuals(
+  fieldName: string,
+  value: string | undefined,
+  state: {
+    project_meta?: {
+      field_mappings?: Record<string, { original_value?: string; mapped_value?: string; confidence?: number }>;
+      field_visuals?: Record<string, { icon?: string; color?: string; characteristics?: string[] }>;
+    };
+  },
+  predefinedVisuals?: Record<string, { icon: React.ComponentType<{ size?: number; className?: string }>; color: string; characteristics: string[] }>
+): { icon: React.ComponentType<{ size?: number; className?: string }>; color: string; characteristics: string[] } | null {
+  // Re-export from visualHelpers for convenience
+  // This allows cards to use it without importing visualHelpers directly
+  if (!value) return null;
+
+  // 1. Check predefined visuals first (if provided)
+  if (predefinedVisuals && predefinedVisuals[value]) {
+    return predefinedVisuals[value];
+  }
+
+  // 2. Check if value was mapped to a predefined option
+  const mappings = state.project_meta?.field_mappings || {};
+  if (fieldName in mappings) {
+    const mapping = mappings[fieldName];
+    const mappedValue = mapping.mapped_value;
+    if (mappedValue && mapping.confidence && mapping.confidence >= 0.7) {
+      // Use predefined visuals for mapped value
+      if (predefinedVisuals && predefinedVisuals[mappedValue]) {
+        return predefinedVisuals[mappedValue];
+      }
+    }
+  }
+
+  // 3. Check generated visuals from backend
+  const visuals = state.project_meta?.field_visuals || {};
+  if (fieldName in visuals) {
+    const visualData = visuals[fieldName];
+    if (visualData && visualData.icon && visualData.color) {
+      // Import icon dynamically - for now return a structure that cards can use
+      // Cards will handle icon loading via visualHelpers
+      return {
+        icon: () => null, // Will be loaded by visualHelpers
+        color: visualData.color || "#6B7280",
+        characteristics: visualData.characteristics || ["Custom", "Unique", "Specialized"]
+      };
+    }
+  }
+
+  return null;
 }
 
 /**

@@ -11,6 +11,7 @@ import { updateProject, getProjectState } from "@/lib/api";
 import type { SourceType } from "../SourceBadge";
 import SingleSelectChips from "../pickers/SingleSelectChips";
 import { MessageCircle, Briefcase, Smile, Coffee, Award, Sparkles, Zap } from "lucide-react";
+import { getFieldVisuals, renderCustomFieldDisplay } from "../visualHelpers";
 
 // Tone visual mapping
 const toneVisuals: Record<string, { icon: React.ComponentType<{ size?: number; className?: string }>; color: string; characteristics: string[] }> = {
@@ -70,9 +71,11 @@ export default function ToneCard({
       TONE_OPTIONS,
       userOverrideValue,
       inferredValue,
-      currentValue
+      currentValue,
+      state,
+      "tone"
     );
-  }, [userOverrideValue, inferredValue, currentValue]);
+  }, [userOverrideValue, inferredValue, currentValue, state]);
 
   useEffect(() => {
     setValue(typeof currentValue === "string" ? currentValue : priorityResult?.selectedValue);
@@ -111,43 +114,70 @@ export default function ToneCard({
   const toneValue = typeof currentValue === "string" ? currentValue : "";
   const toneLabel = TONE_OPTIONS.find((opt) => opt.value === toneValue)?.label || toneValue || "";
   const toneVisual = toneValue ? toneVisuals[toneValue] : null;
-  const ToneIcon = toneVisual?.icon || MessageCircle;
+  
+  // Check for generated visuals if no predefined visual
+  const generatedVisuals = useMemo(() => {
+    if (!toneValue || toneVisual) return null;
+    return getFieldVisuals("tone", toneValue, state, toneVisuals);
+  }, [toneValue, toneVisual, state]);
 
-  const displayValue = toneValue && toneVisual ? (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <div 
-          className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ 
-            backgroundColor: `${toneVisual.color}15`,
-            color: toneVisual.color
-          }}
-        >
-          <ToneIcon size={24} style={{ color: toneVisual.color }} />
-        </div>
-        <div>
-          <p className="text-base font-semibold text-text-primary">{toneLabel}</p>
-          <p className="text-sm text-text-muted">
-            {TONE_OPTIONS.find((opt) => opt.value === toneValue)?.description}
-          </p>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {toneVisual.characteristics.map((char, i) => (
-          <span
-            key={i}
-            className="px-2 py-1 text-xs rounded-md"
-            style={{
-              backgroundColor: `${toneVisual.color}10`,
-              color: toneVisual.color,
-              border: `1px solid ${toneVisual.color}30`
+  const displayValue = toneValue ? (
+    toneVisual ? (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ 
+              backgroundColor: `${toneVisual.color}15`,
+              color: toneVisual.color
             }}
           >
-            {char}
-          </span>
-        ))}
+            <toneVisual.icon size={24} style={{ color: toneVisual.color }} />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-text-primary">{toneLabel}</p>
+            <p className="text-sm text-text-muted">
+              {TONE_OPTIONS.find((opt) => opt.value === toneValue)?.description}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {toneVisual.characteristics.map((char, i) => (
+            <span
+              key={i}
+              className="px-2 py-1 text-xs rounded-md"
+              style={{
+                backgroundColor: `${toneVisual.color}10`,
+                color: toneVisual.color,
+                border: `1px solid ${toneVisual.color}30`
+              }}
+            >
+              {char}
+            </span>
+          ))}
+        </div>
       </div>
-    </div>
+    ) : generatedVisuals ? (
+      renderCustomFieldDisplay(toneValue, generatedVisuals, toneLabel)
+    ) : (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ 
+              backgroundColor: "#6B728015",
+              color: "#6B7280"
+            }}
+          >
+            <MessageCircle size={24} style={{ color: "#6B7280" }} />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-text-primary">{toneLabel}</p>
+            <p className="text-sm text-text-muted">Custom tone</p>
+          </div>
+        </div>
+      </div>
+    )
   ) : (
     <p className="text-text-muted italic text-sm">Select tone of voice</p>
   );

@@ -12,6 +12,8 @@ from typing import Optional
 from utils import get_filled_prompt, stream_gemini, ask_gemini, log_agent_action
 from utils_scraper import scrape_url, extract_url_from_text, generate_mock_research, is_valid_url, normalize_url
 from state_schema import WebsiteState, AgentReasoning
+from services.field_mapper import map_to_closest_option
+from services.visual_generator import generate_field_visuals
 
 
 def run_research_agent(state: WebsiteState, url: Optional[str] = None, feedback: str = None):
@@ -130,12 +132,52 @@ def run_research_agent(state: WebsiteState, url: Optional[str] = None, feedback:
     # Phase 3: Save to state
     state.additional_context["research_data"] = research_data
 
-    # Also update state fields if we learned new information
-    if not state.industry and research_data.get("inferred_industry"):
-        state.industry = research_data["inferred_industry"]
-        state.project_meta.setdefault("inferred_fields", []).append("industry")
+    # Ensure project_meta structure
+    if "field_mappings" not in state.project_meta:
+        state.project_meta["field_mappings"] = {}
+    if "field_visuals" not in state.project_meta:
+        state.project_meta["field_visuals"] = {}
 
-    if not state.brand_colors and research_data.get("suggested_color_palette"):
+    # Build context for mapping/visual generation
+    context = f"Business: {state.project_name}, Industry: {state.industry}"
+
+    # Phase 3.5: Map and generate visuals for inferred values
+    # Handle industry
+    if research_data.get("inferred_industry"):
+        inferred_industry = research_data["inferred_industry"]
+        if not state.industry:
+            # Attempt mapping
+            industry_options = [
+                {"value": "technology", "label": "Technology", "description": "Software, SaaS, IT services"},
+                {"value": "ecommerce", "label": "E-commerce", "description": "Online retail, marketplaces"},
+                {"value": "healthcare", "label": "Healthcare", "description": "Medical, wellness, fitness"},
+                {"value": "finance", "label": "Finance", "description": "Banking, fintech, insurance"},
+                {"value": "education", "label": "Education", "description": "Schools, courses, e-learning"},
+                {"value": "restaurant", "label": "Restaurant", "description": "Food service, cafes, bars"},
+                {"value": "real_estate", "label": "Real Estate", "description": "Properties, agencies"},
+                {"value": "professional_services", "label": "Professional Services", "description": "Legal, consulting, agencies"},
+                {"value": "creative", "label": "Creative", "description": "Design, photography, art"},
+                {"value": "nonprofit", "label": "Nonprofit", "description": "Charities, foundations"},
+                {"value": "other", "label": "Other", "description": "Something else"},
+            ]
+            try:
+                mapping = map_to_closest_option("industry", inferred_industry, industry_options, context)
+                if mapping.get("mapped_value") and mapping.get("confidence", 0) >= 0.7:
+                    state.industry = mapping["mapped_value"]
+                    state.project_meta["field_mappings"]["industry"] = mapping
+                else:
+                    state.industry = inferred_industry
+                    # Generate visuals for unmatched
+                    visuals = generate_field_visuals("industry", inferred_industry, "industry", context)
+                    state.project_meta["field_visuals"]["industry"] = visuals
+                state.project_meta.setdefault("inferred_fields", []).append("industry")
+            except Exception as e:
+                print(f"[Research] Mapping/visual generation failed for industry: {str(e)}")
+                state.industry = inferred_industry
+                state.project_meta.setdefault("inferred_fields", []).append("industry")
+
+    # Handle brand colors
+    if research_data.get("suggested_color_palette") and not state.brand_colors:
         state.brand_colors = research_data["suggested_color_palette"][:3]  # Take top 3
         state.project_meta.setdefault("inferred_fields", []).append("brand_colors")
 

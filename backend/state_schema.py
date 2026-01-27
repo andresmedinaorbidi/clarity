@@ -33,6 +33,8 @@ def _default_project_meta() -> Dict[str, Any]:
     return {
         "inferred": {},        # Dict[str, InferredField-like dict]
         "user_overrides": {},  # Dict[str, Any] - explicit user values
+        "field_mappings": {},  # Dict[str, Dict] - Maps field_name → {original_value, mapped_value, confidence, rationale}
+        "field_visuals": {},   # Dict[str, Dict] - Maps field_name → {icon, color, characteristics} for unmatched values
     }
 
 

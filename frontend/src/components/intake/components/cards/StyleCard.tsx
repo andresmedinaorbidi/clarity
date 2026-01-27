@@ -11,6 +11,7 @@ import { updateProject, getProjectState } from "@/lib/api";
 import type { SourceType } from "../SourceBadge";
 import StyleChooser from "../pickers/StyleChooser";
 import { Palette } from "lucide-react";
+import { getFieldVisuals, renderCustomFieldDisplay } from "../visualHelpers";
 
 /**
  * Style preview thumbnails with visual representations
@@ -104,9 +105,11 @@ export default function StyleCard({
       STYLE_OPTIONS,
       userOverrideValue,
       inferredValue,
-      currentValue
+      currentValue,
+      state,
+      "design_style"
     );
-  }, [userOverrideValue, inferredValue, currentValue]);
+  }, [userOverrideValue, inferredValue, currentValue, state]);
 
   useEffect(() => {
     setValue(typeof currentValue === "string" ? currentValue : priorityResult?.selectedValue);
@@ -146,17 +149,41 @@ export default function StyleCard({
 
   const styleValue = typeof currentValue === "string" ? currentValue : "";
   const styleLabel = STYLE_OPTIONS.find((opt) => opt.value === styleValue)?.label || styleValue || "";
+  const styleOption = STYLE_OPTIONS.find((opt) => opt.value === styleValue);
+  
+  // Check for generated visuals if no predefined option
+  const generatedVisuals = useMemo(() => {
+    if (!styleValue || styleOption) return null;
+    return getFieldVisuals("design_style", styleValue, state);
+  }, [styleValue, styleOption, state]);
 
   const displayValue = styleValue ? (
-    <div className="space-y-3">
-      <StylePreview style={styleValue} />
-      <p className="text-base font-semibold text-text-primary">{styleLabel}</p>
-      {STYLE_OPTIONS.find((opt) => opt.value === styleValue)?.description && (
-        <p className="text-sm text-text-muted">
-          {STYLE_OPTIONS.find((opt) => opt.value === styleValue)?.description}
-        </p>
-      )}
-    </div>
+    styleOption ? (
+      <div className="space-y-3">
+        <StylePreview style={styleValue} />
+        <p className="text-base font-semibold text-text-primary">{styleLabel}</p>
+        {styleOption.description && (
+          <p className="text-sm text-text-muted">
+            {styleOption.description}
+          </p>
+        )}
+      </div>
+    ) : generatedVisuals ? (
+      <div className="space-y-3">
+        <div className="w-full aspect-[4/3] rounded-lg overflow-hidden border border-gray-200 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+          <Palette size={32} className="text-gray-400" />
+        </div>
+        {renderCustomFieldDisplay(styleValue, generatedVisuals, styleLabel)}
+      </div>
+    ) : (
+      <div className="space-y-3">
+        <div className="w-full aspect-[4/3] rounded-lg overflow-hidden border border-gray-200 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+          <Palette size={32} className="text-gray-400" />
+        </div>
+        <p className="text-base font-semibold text-text-primary">{styleLabel}</p>
+        <p className="text-sm text-text-muted">Custom design style</p>
+      </div>
+    )
   ) : (
     <p className="text-text-muted italic text-sm">Select design style</p>
   );
