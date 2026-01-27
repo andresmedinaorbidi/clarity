@@ -3,7 +3,7 @@
  * FlowShell - Primary post-hero UI container (PR-06, PR-07)
  *
  * Implements a linear, full-screen UX flow:
- * 1. Guided Intake (PR-07: GuidedIntakeView with pickers)
+ * 1. Magical Intake (MagicalIntakeView with all fields in cards)
  * 2. Loading screen (placeholder for PR-09)
  * 3. Website Preview (when generated_code exists)
  *
@@ -13,7 +13,7 @@
 
 import React, { useState, useCallback } from "react";
 import type { WebsiteState } from "@/hooks/use-orchestrator";
-import GuidedIntakeView from "@/components/intake/GuidedIntakeView";
+import MagicalIntakeView from "@/components/intake/MagicalIntakeView";
 
 interface FlowShellProps {
   state: WebsiteState;
@@ -54,9 +54,9 @@ function WebsitePreview({ state }: { state: WebsiteState }) {
 /**
  * FlowShell - Main routing component
  *
- * Routing logic (PR-06/PR-07):
+ * Routing logic:
  * 1. If generated_code exists and is non-empty -> WebsitePreview
- * 2. Else -> GuidedIntakeView (PR-07)
+ * 2. Else -> MagicalIntakeView (single-screen magical intake)
  *
  * Future additions:
  * - PR-09: Loading screen between intake and preview
@@ -70,13 +70,13 @@ export default function FlowShell({ state, sendMessage, loading }: FlowShellProp
     setLocalState(state);
   }, [state]);
 
-  // Handler for state updates from GuidedIntakeView
+  // Handler for state updates from MagicalIntakeView
   const handleStateUpdated = useCallback((newState: WebsiteState) => {
     setLocalState(newState);
   }, []);
 
   // Handler for "Create Website" button
-  // PR-07: Just calls sendMessage("Proceed") to start the pipeline
+  // Just calls sendMessage("Proceed") to start the pipeline
   // PR-09 will add a loading screen before this
   const handleCreateWebsite = useCallback(async () => {
     try {
@@ -94,7 +94,7 @@ export default function FlowShell({ state, sendMessage, loading }: FlowShellProp
       {hasGeneratedCode ? (
         <WebsitePreview state={localState} />
       ) : (
-        <GuidedIntakeView
+        <MagicalIntakeView
           state={localState}
           onStateUpdated={handleStateUpdated}
           onCreateWebsite={handleCreateWebsite}

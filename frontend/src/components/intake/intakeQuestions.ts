@@ -378,3 +378,57 @@ export function getActiveQuestions(
     return true;
   });
 }
+
+/**
+ * Get the data source for a field (user, crm, scraped, inferred)
+ * Priority: user_overrides > crm_data > scraped > inferred
+ */
+export function getFieldSource(
+  fieldName: string,
+  state: {
+    project_meta?: {
+      user_overrides?: Record<string, unknown>;
+      inferred?: Record<string, { value: unknown; source?: string }>;
+    };
+    crm_data?: Record<string, unknown>;
+    additional_context?: {
+      research_data?: Record<string, unknown>;
+      scrape_summary?: Record<string, unknown>;
+    };
+  }
+): "user" | "crm" | "scraped" | "inferred" {
+  // 1. Check user overrides first (highest priority)
+  const userOverrides = state.project_meta?.user_overrides ?? {};
+  if (fieldName in userOverrides && userOverrides[fieldName] !== undefined && userOverrides[fieldName] !== null && userOverrides[fieldName] !== "") {
+    return "user";
+  }
+
+  // 2. Check CRM data
+  const crmData = state.crm_data ?? {};
+  if (fieldName === "industry" && crmData.industry) return "crm";
+  if (fieldName === "brand_colors" && crmData.colors) return "crm";
+  if (fieldName === "project_name" && crmData.name) return "crm";
+
+  // 3. Check scraped/research data
+  const researchData = state.additional_context?.research_data ?? {};
+  const scrapeSummary = state.additional_context?.scrape_summary ?? {};
+  if (researchData[fieldName] || scrapeSummary[fieldName]) {
+    return "scraped";
+  }
+
+  // 4. Check inferred (with source tracking)
+  const inferred = state.project_meta?.inferred ?? {};
+  if (fieldName in inferred) {
+    const inferredData = inferred[fieldName];
+    if (inferredData && typeof inferredData === "object" && "value" in inferredData) {
+      const source = inferredData.source;
+      if (source === "scraped" || source === "hybrid") {
+        return "scraped";
+      }
+      return "inferred";
+    }
+  }
+
+  // Default: if field has a value but no source tracking, assume inferred
+  return "inferred";
+}
