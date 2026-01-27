@@ -3,13 +3,13 @@
 
 :root {
   /* Light Theme Brand Palette */
-  --brand-dark: #f5f5eb;          /* Main background - cream */
-  --brand-surface: #fafaf5;       /* Card/surface backgrounds - lighter cream */
-  --brand-border: #d4d4c8;        /* Border color - subtle gray on cream */
+  --brand-dark: #ffffff;           /* Main background - white */
+  --brand-surface: #ffffff;         /* Card/surface backgrounds - white */
+  --brand-border: #e5e7eb;         /* Border color - subtle gray on white */
 
   --brand-primary: #beff50;        /* Primary green */
   --brand-secondary: #a8e03d;      /* Complementary darker green */
-  --brand-accent: #60259f;        /* Purple - for AI-generated content only */
+  --brand-accent: #60259f;         /* Purple - for AI-generated content only */
 
   /* Text colors for light theme */
   --text-primary: #111827;        /* Almost black for main text */
@@ -73,6 +73,34 @@ body {
   color: var(--text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Premium Background with Texture */
+.bg-premium {
+  background-color: #ffffff;
+  background-image: 
+    radial-gradient(circle, rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(190, 255, 80, 0.03) 0%, rgba(96, 37, 159, 0.02) 100%);
+  background-size: 20px 20px, 100% 100%;
+  background-position: 0 0, 0 0;
+  position: relative;
+}
+
+.bg-premium::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(190, 255, 80, 0.02) 0%,
+    transparent 30%,
+    transparent 70%,
+    rgba(96, 37, 159, 0.02) 100%
+  );
+  pointer-events: none;
 }
 
 /* Custom Scrollbar for the Magic UI */
@@ -176,4 +204,32 @@ body {
 .option-recommended {
   border-color: var(--brand-accent) !important;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-accent) 30%, transparent);
+}
+
+/* ============================================================================
+   Premium Card Styles
+   ============================================================================ */
+
+/* Premium card base styling */
+.card-premium {
+  background: #ffffff;
+  border: 1px solid var(--brand-border);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-premium:hover {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08), 0 4px 8px rgba(0, 0, 0, 0.06);
+  transform: translateY(-2px);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Enhanced shadow utilities */
+.shadow-premium {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-premium-hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
 }

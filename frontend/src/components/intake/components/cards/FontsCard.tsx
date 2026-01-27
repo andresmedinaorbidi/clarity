@@ -10,6 +10,47 @@ import type { WebsiteState } from "@/hooks/use-orchestrator";
 import { updateProject, getProjectState } from "@/lib/api";
 import type { SourceType } from "../SourceBadge";
 import FontPicker from "../pickers/FontPicker";
+import { Type } from "lucide-react";
+
+// Font pair mapping
+const fontMap: Record<string, { heading: string; body: string; headingFamily: string; bodyFamily: string }> = {
+  inter_playfair: { 
+    heading: "Playfair Display", 
+    body: "Inter",
+    headingFamily: "'Playfair Display', serif",
+    bodyFamily: "'Inter', sans-serif"
+  },
+  poppins_lora: { 
+    heading: "Lora", 
+    body: "Poppins",
+    headingFamily: "'Lora', serif",
+    bodyFamily: "'Poppins', sans-serif"
+  },
+  roboto_roboto_slab: { 
+    heading: "Roboto Slab", 
+    body: "Roboto",
+    headingFamily: "'Roboto Slab', serif",
+    bodyFamily: "'Roboto', sans-serif"
+  },
+  montserrat_merriweather: { 
+    heading: "Montserrat", 
+    body: "Merriweather",
+    headingFamily: "'Montserrat', sans-serif",
+    bodyFamily: "'Merriweather', serif"
+  },
+  open_sans_oswald: { 
+    heading: "Oswald", 
+    body: "Open Sans",
+    headingFamily: "'Oswald', sans-serif",
+    bodyFamily: "'Open Sans', sans-serif"
+  },
+  system: { 
+    heading: "System UI", 
+    body: "System UI",
+    headingFamily: "system-ui, sans-serif",
+    bodyFamily: "system-ui, sans-serif"
+  },
+};
 
 interface FontsCardProps {
   state: WebsiteState;
@@ -72,11 +113,48 @@ export default function FontsCard({
     setIsEditing(false);
   };
 
-  const displayValue = FONT_OPTIONS.find((opt) => opt.value === currentValue)?.label || currentValue || "";
+  // Get font info for display
+  const fontInfo = useMemo(() => {
+    const fontValue = typeof currentValue === "string" ? currentValue : "";
+    return fontMap[fontValue] || null;
+  }, [currentValue]);
+
+  const displayValue = fontInfo ? (
+    <div className="space-y-4">
+      {/* Display Font Section */}
+      <div>
+        <p className="text-xs font-medium text-text-muted mb-2">Display Font</p>
+        <p
+          className="text-2xl font-bold text-text-primary mb-1"
+          style={{ 
+            fontFamily: fontInfo.headingFamily,
+            fontStyle: fontInfo.headingFamily.includes('serif') ? 'italic' : 'normal'
+          }}
+        >
+          {fontInfo.heading}
+        </p>
+        <p className="text-sm text-text-muted">{fontInfo.heading}</p>
+      </div>
+
+      {/* Body Font Section */}
+      <div>
+        <p className="text-xs font-medium text-text-muted mb-2">Body Font</p>
+        <p
+          className="text-base text-text-primary mb-1"
+          style={{ fontFamily: fontInfo.bodyFamily }}
+        >
+          {fontInfo.body}
+        </p>
+        <p className="text-sm text-text-muted">{fontInfo.body}</p>
+      </div>
+    </div>
+  ) : (
+    <p className="text-text-muted italic text-sm">Select font pairing</p>
+  );
 
   return (
     <FieldCard
-      label="Fonts"
+      label="Typography"
       value={displayValue}
       source={source}
       isEditing={isEditing}
@@ -85,6 +163,8 @@ export default function FontsCard({
       onCancel={handleCancel}
       loading={loading}
       emptyPlaceholder="Select font pairing"
+      icon={Type}
+      iconColor="#22C55E"
     >
       <FontPicker
         options={priorityResult?.options || FONT_OPTIONS}

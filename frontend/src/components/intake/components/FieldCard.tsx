@@ -5,7 +5,7 @@
 
 import React, { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Edit2, Check, X } from "lucide-react";
+import { Edit2, Check, X, LucideIcon } from "lucide-react";
 import SourceBadge, { SourceType } from "./SourceBadge";
 
 interface FieldCardProps {
@@ -20,6 +20,8 @@ interface FieldCardProps {
   required?: boolean;
   emptyPlaceholder?: string;
   children?: ReactNode; // Picker content when editing
+  icon?: LucideIcon;
+  iconColor?: string; // Optional custom color for icon
 }
 
 export default function FieldCard({
@@ -34,6 +36,8 @@ export default function FieldCard({
   required = false,
   emptyPlaceholder = "Not set",
   children,
+  icon: Icon,
+  iconColor,
 }: FieldCardProps) {
   const hasValue = value !== null && value !== undefined && value !== "";
 
@@ -42,12 +46,23 @@ export default function FieldCard({
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-brand-surface border border-brand-border rounded-xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow"
+      className="card-premium p-5"
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium text-text-primary">{label}</h3>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          {Icon && (
+            <div 
+              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ 
+                backgroundColor: iconColor ? `${iconColor}15` : 'rgba(190, 255, 80, 0.1)',
+                color: iconColor || '#beff50'
+              }}
+            >
+              <Icon size={18} style={{ color: iconColor || '#beff50' }} />
+            </div>
+          )}
+          <h3 className="text-base font-semibold text-text-primary">{label}</h3>
           {required && (
             <span className="text-xs text-text-muted">*</span>
           )}
@@ -58,7 +73,7 @@ export default function FieldCard({
             <button
               type="button"
               onClick={onEdit}
-              className="p-1.5 rounded-lg hover:bg-brand-dark transition-colors text-text-muted hover:text-text-primary"
+              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-text-muted hover:text-text-primary"
               title="Edit"
             >
               <Edit2 size={14} />

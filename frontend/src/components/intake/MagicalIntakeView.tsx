@@ -55,33 +55,18 @@ export default function MagicalIntakeView({
   };
 
   return (
-    <div className="h-full flex flex-col bg-brand-dark overflow-y-auto">
-      {/* Header */}
-      <div className="flex-shrink-0 p-4 sm:p-6 border-b border-brand-border">
+    <div className="h-full flex flex-col bg-premium overflow-y-auto relative">
+      {/* Main content - Two column layout */}
+      <div className="flex-1 p-4 sm:p-6 lg:p-8">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-semibold text-text-primary mb-1">
-                {state.project_name || "Your Business"}
-              </h1>
-              <p className="text-text-secondary text-sm">
-                Review and edit your business information
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main content - Masonry grid */}
-      <div className="flex-1 p-4 sm:p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Masonry grid layout - responsive columns */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-max">
-            {/* Business Name Card */}
+          {/* Two column grid layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+            {/* Business Name Card - Full width at top */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0 }}
+              className="lg:col-span-2"
             >
               <BusinessNameCard
                 state={state}
@@ -89,97 +74,101 @@ export default function MagicalIntakeView({
               />
             </motion.div>
 
-            {/* Industry Card */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
-            >
-              <IndustryCard
-                state={state}
-                onStateUpdated={onStateUpdated}
-              />
-            </motion.div>
+            {/* Left Column: Brand Identity */}
+            <div className="space-y-6 lg:space-y-8">
+              {/* Brand Colors */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+              >
+                <ColorsCard
+                  state={state}
+                  onStateUpdated={onStateUpdated}
+                />
+              </motion.div>
 
-            {/* Goal Card */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <GoalCard
-                state={state}
-                onStateUpdated={onStateUpdated}
-              />
-            </motion.div>
+              {/* Typography */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+              >
+                <FontsCard
+                  state={state}
+                  onStateUpdated={onStateUpdated}
+                />
+              </motion.div>
 
-            {/* Style Card */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-            >
-              <StyleCard
-                state={state}
-                onStateUpdated={onStateUpdated}
-              />
-            </motion.div>
+              {/* Style */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <StyleCard
+                  state={state}
+                  onStateUpdated={onStateUpdated}
+                />
+              </motion.div>
+            </div>
 
-            {/* Tone Card */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <ToneCard
-                state={state}
-                onStateUpdated={onStateUpdated}
-              />
-            </motion.div>
+            {/* Right Column: Business Details */}
+            <div className="space-y-6 lg:space-y-8">
+              {/* Industry */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+              >
+                <IndustryCard
+                  state={state}
+                  onStateUpdated={onStateUpdated}
+                />
+              </motion.div>
 
-            {/* Colors Card - Spans 2 columns on larger screens */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
-              className="sm:col-span-2 lg:col-span-2 xl:col-span-2"
-            >
-              <ColorsCard
-                state={state}
-                onStateUpdated={onStateUpdated}
-              />
-            </motion.div>
+              {/* Goal */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+              >
+                <GoalCard
+                  state={state}
+                  onStateUpdated={onStateUpdated}
+                />
+              </motion.div>
 
-            {/* Fonts Card */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <FontsCard
-                state={state}
-                onStateUpdated={onStateUpdated}
-              />
-            </motion.div>
+              {/* Brand Tone */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <ToneCard
+                  state={state}
+                  onStateUpdated={onStateUpdated}
+                />
+              </motion.div>
 
-            {/* Pages Card - Spans 2 columns on larger screens */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="sm:col-span-2 lg:col-span-2 xl:col-span-2"
-            >
-              <PagesCard
-                state={state}
-                onStateUpdated={onStateUpdated}
-              />
-            </motion.div>
+              {/* Pages */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 }}
+              >
+                <PagesCard
+                  state={state}
+                  onStateUpdated={onStateUpdated}
+                />
+              </motion.div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Footer with Create Website button */}
-      <div className="flex-shrink-0 p-4 sm:p-6 border-t border-brand-border bg-brand-surface/50 backdrop-blur-sm sticky bottom-0">
+      <div className="flex-shrink-0 p-4 sm:p-6 border-t border-brand-border bg-white/80 backdrop-blur-sm sticky bottom-0 z-10">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between">
             <div className="text-sm text-text-secondary">

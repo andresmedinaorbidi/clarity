@@ -95,10 +95,23 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
     │   │   ├── ArtifactWorkspace.tsx # Artifact tabs (Sitemap, PRD, Marketing)
     │   │   ├── BuilderSection.tsx   # Website preview (iframe)
     │   │   └── AgentTrace.tsx       # Agent reasoning visualization
-    │   ├── components/intake/  # PR-07: Guided intake wizard
-    │   │   ├── GuidedIntakeView.tsx      # Main wizard component
+    │   ├── components/intake/  # Intake components
+    │   │   ├── MagicalIntakeView.tsx     # Single-screen magical intake (all fields at once)
+    │   │   ├── GuidedIntakeView.tsx      # Legacy step-by-step wizard (kept for fallback)
     │   │   ├── intakeQuestions.ts        # Question definitions and field helpers
-    │   │   └── components/pickers/       # UI pickers (SingleSelectChips, ColorPicker, etc.)
+    │   │   ├── components/
+    │   │   │   ├── cards/                # Field-specific card components
+    │   │   │   │   ├── BusinessNameCard.tsx
+    │   │   │   │   ├── IndustryCard.tsx
+    │   │   │   │   ├── GoalCard.tsx
+    │   │   │   │   ├── StyleCard.tsx
+    │   │   │   │   ├── ToneCard.tsx
+    │   │   │   │   ├── ColorsCard.tsx
+    │   │   │   │   ├── FontsCard.tsx
+    │   │   │   │   └── PagesCard.tsx
+    │   │   │   ├── SourceBadge.tsx       # Data source indicator badge
+    │   │   │   ├── FieldCard.tsx         # Base card wrapper component
+    │   │   │   └── pickers/              # UI pickers (SingleSelectChips, ColorPicker, etc.)
     │   ├── hooks/
     │   │   └── use-orchestrator.ts  # State management & streaming API client
     │   ├── contexts/
@@ -118,11 +131,11 @@ Clarity is a multi-agent AI-powered website builder that transforms business des
 * **frontend/src/components/magic/**: Specialized UI components for each phase
 * **frontend/src/hooks/**: State management and API communication
 
-**FlowShell Routing (PR-06/PR-07/PR-07.1/PR-07.1b):**
+**FlowShell Routing:**
 
-The app now uses a linear full-screen UX flow post-hero:
+The app uses a linear full-screen UX flow post-hero:
 1. `page.tsx` checks `USE_FLOW_SHELL` flag (default: true)
-2. After hero submission (PR-07.1b enhanced):
+2. After hero submission:
    - Shows `BootstrappingScreen` ("Setting things up…") immediately
    - Calls `/enrich` endpoint via `enrichProject()` to populate inferred values
    - Calls `refreshState()` to sync enriched data to React state
@@ -131,26 +144,49 @@ The app now uses a linear full-screen UX flow post-hero:
    - Transitions to FlowShell only when `isStateReady && !loading`
 3. FlowShell routing:
    - If `state.generated_code` exists → Full-screen website preview (iframe)
-   - Else → GuidedIntakeView (PR-07: wizard with pickers)
-4. PR-07.1: Business name handling:
-   - If user-provided in hero → skip business name question
-   - If inferred only → show `InferredNameBanner` with Edit option
+   - Else → MagicalIntakeView (single-screen magical intake with all fields)
 
-**Guided Intake (PR-07/PR-07.1):**
+**Magical Intake (Current):**
 
-GuidedIntakeView displays one question at a time:
-- Questions: project_name → industry → goal → design_style → tone → brand_colors → font_pair → draft_pages
-- PR-07.1: project_name question skipped if user-provided (via hero or override)
-- Field value priority: `user_overrides` > `inferred` > top-level state > empty
-- Persistence: calls `/update-project` with both field value and `project_meta.user_overrides`
-- Pickers: SingleSelectChips, MultiSelectChips, StyleChooser, ColorPicker, FontPicker
-- PR-07.1: Priority options - inferred/user values injected at top of option lists with badges:
-  - "Recommended" badge (purple) for AI-inferred values
-  - "From your description" badge (green) for user-provided values
-- Each question has "Type instead" toggle for free-form input
-- PR-07.1: Progress bar uses brand accent purple, shows "Step X of Y"
-- PR-07.1: Buttons use global `.btn-primary` class (black)
-- Completion screen shows summary and "Create Website" CTA
+MagicalIntakeView displays all business information at once in a structured 2-column premium card layout:
+- **Layout**: Two-column grid (1 column mobile → 2 columns desktop)
+  - Left column: Brand Colors, Typography, Style (Brand Identity section)
+  - Right column: Industry, Goal, Brand Tone, Pages (Business Details section)
+  - Business Name: Full-width header card at top with logo placeholder
+  - Spacing: gap-6 on mobile, gap-8 on desktop with consistent vertical rhythm
+- **Premium Background**: White background with subtle dot texture pattern and gradient overlays
+- **8 Field Cards**: Business Name, Industry, Goal, Style, Tone, Colors, Fonts, Pages
+  - Each card features contextual icon, premium styling with enhanced shadows and hover effects
+  - Visual displays: 
+    - Business Name: Full-width header with logo placeholder (80x80px)
+    - Colors: Grid of swatches with names/hex codes
+    - Typography: Display Font and Body Font sections with actual font rendering
+    - Style: Visual style preview thumbnail
+    - Tone: Icon-based indicators with characteristics chips
+    - Industry: Icon-based indicators with characteristics chips (matches ToneCard style)
+    - Goal: Icon-based indicators with characteristics chips (matches ToneCard style)
+    - Pages: Multi-select chips display
+- **Source Tracking**: Each card shows data source badge (user/CRM/scraped/inferred)
+- **Inline Editing**: Click edit icon on any card to modify field inline
+- **Field Value Priority**: `user_overrides` > `inferred` > top-level state > empty
+- **Persistence**: Calls `/update-project` with field value and `project_meta.user_overrides`
+- **Special Pickers**: 
+  - Colors: Inline color palette selector (display shows grid of swatches with names/hex codes)
+  - Fonts: Inline font preview grid (display shows Display Font and Body Font sections with actual font rendering)
+  - Style: Inline visual style chooser (display shows style preview thumbnail)
+  - Tone: Visual tone selector with icons and characteristics (display shows icon and colored badges)
+  - Industry: Visual selector with icons and characteristics (display shows icon and colored badges)
+  - Goal: Visual selector with icons and characteristics (display shows icon and colored badges)
+  - Others: Standard chips/text inputs
+- **Validation**: "Create Website" button only enables when required fields filled (project_name, industry, design_style, brand_colors)
+- **Source Detection**: Uses `getFieldSource()` utility to determine data origin (user input, CRM, scraped, or AI inference)
+
+**Guided Intake (Legacy - Kept for Fallback):**
+
+GuidedIntakeView (step-by-step wizard) is still available but replaced by MagicalIntakeView:
+- Displays one question at a time with progress bar
+- Used as fallback or for debugging
+- Same field priority and persistence logic as MagicalIntakeView
 
 ---
 
@@ -197,7 +233,9 @@ GuidedIntakeView displays one question at a time:
 
 **project_meta Structure** (PR-02):
 * `project_meta["inferred"]`: Dict of field_name → InferredField-like objects (machine-suggested values)
+  * Structure: `{value, confidence, source, rationale}` where source is "llm", "scraped", "hybrid", or "default"
 * `project_meta["user_overrides"]`: Dict of field_name → user-provided values (always takes precedence)
+* Used by both MagicalIntakeView and GuidedIntakeView for field value resolution
 
 **Skill** (backend/agents/registry.py):
 * `id`, `name`, `description`
@@ -232,7 +270,11 @@ GuidedIntakeView displays one question at a time:
 
 ### 5.2 Key Use Cases
 
-* **CreateWebsite**: User provides business info → System generates complete website
+* **CreateWebsite**: User provides business info (via magical intake screen) → System generates complete website
+  * User sees all fields at once in card layout
+  * AI auto-fills fields from user input, scraped data, CRM, or LLM inference
+  * User can edit any field inline
+  * "Create Website" button triggers full build pipeline
 * **ReviseSitemap**: User provides feedback → Planner agent regenerates sitemap
 * **UpdateCopy**: User requests copy changes → Copy agent regenerates content
 * **ResearchBusiness**: User provides website URL → Research agent scrapes and analyzes
@@ -242,12 +284,13 @@ GuidedIntakeView displays one question at a time:
 
 * Intake must complete (no missing_info) before proceeding to research
 * Project Brief (strategy) must be approved before UX phase
-* PR-07.1: Sitemap (planning) no longer requires approval gate - user approval happens at guided intake completion ("Create Website" button)
+* Sitemap (planning) no longer requires approval gate - user approval happens at magical intake completion ("Create Website" button)
 * Marketing content (copywriting) requires approval (Gate 2: Marketing) - currently disabled in new flow
 * Memory compression runs every 5 chat turns
 * URL detection automatically triggers research agent
 * CRM data fetching runs automatically if project_name matches known companies
-* PR-07.1: After "Create Website" click, build chain runs uninterrupted: research → strategy → ux → planning → seo → copywriting → prd → building
+* After "Create Website" click, build chain runs uninterrupted: research → strategy → ux → planning → seo → copywriting → prd → building
+* Field source tracking: System tracks whether each field came from user input, CRM, scraped data, or AI inference
 
 ---
 
@@ -472,7 +515,11 @@ intake → research → strategy → ux → planning → seo → copywriting →
 ### 11.1 Current Phase
 
 * **Phase 2 Complete**: Session-based persistence, intent-driven architecture
-* **Phase 3 In Progress**: Split-view UI (WorkspaceView component)
+* **Phase 3 Complete**: Magical single-screen intake (MagicalIntakeView)
+  * Replaced step-by-step wizard with single-screen card layout
+  * All fields visible at once with source tracking
+  * Inline editing for all fields
+  * Auto-population from user input, LLM, scraped data, and CRM
 
 ### 11.2 Potential Extensions
 
@@ -561,14 +608,99 @@ intake → research → strategy → ux → planning → seo → copywriting →
 ## 13. Last Updated
 
 * **Date**: 2026-01-26
-* **Author**: PR-07.1b Implementation
-* **Change Context**: PR-07.1b - Fix bootstrapping loading screen persistence.
-  - **Problem**: Bootstrapping screen ("Setting things up...") appeared briefly then disappeared before inferred values were populated. Root cause: `/enrich` endpoint was never called from frontend, and `isStateReady` condition was truthy for empty objects.
-  - **Solution**:
-    - Added `enrichProject()` function to `api.ts` - calls `/enrich` endpoint with seed text and optional website URL
-    - Updated `handleHeroStart` in `page.tsx` to call `enrichProject()` first, then `refreshState()` to sync data, then `sendMessage()`
-    - Fixed `isStateReady` condition to check `Object.keys().length > 0` for `inferred` and `additional_context` (empty `{}` is truthy in JS)
-    - Added `extractUrl()` helper to parse URLs from hero input for enrichment
-  - **Modified Files**: api.ts, page.tsx, SYSTEM_ARTIFACT.md
-  - **Previous (PR-07.1)**: Global Styles, Progress Bar, Priority Options, Business Name Handling, Bootstrapping Screen, Planning Pause Fix
-* **Version**: 1.7.2
+* **Author**: Two-Column Layout Refinement
+* **Change Context**: Refined MagicalIntakeView from masonry to structured 2-column layout with enhanced visual displays
+  - **Layout Restructure**:
+    - Replaced masonry grid with clean 2-column layout
+    - Left column: Brand Colors, Typography, Style (Brand Identity)
+    - Right column: Industry, Goal, Brand Tone, Pages (Business Details)
+    - Business Name card: Full-width header at top with logo placeholder
+    - Improved spacing: gap-6 on mobile, gap-8 on desktop
+    - Better vertical rhythm with consistent card spacing (space-y-6 on mobile, space-y-8 on desktop)
+  - **Business Name Card Enhancement**:
+    - Full-width header card with prominent business name display
+    - Logo placeholder area (80x80px) with dashed border and icon hint
+    - Enhanced layout: Logo | Business Name | Edit controls
+    - Larger typography (text-2xl sm:text-3xl) for business name
+    - Space reserved for future tagline/description field
+  - **Industry Card Enhancement**:
+    - Applied ToneCard-style visual pattern
+    - Large icon (48px) with colored background container
+    - Industry name prominently displayed with description
+    - Characteristics chips for each industry (e.g., Technology: "Innovation", "Digital", "Cutting-edge")
+    - Industry visual mapping with appropriate icons and colors for all 11 industries
+  - **Goal Card Enhancement**:
+    - Applied ToneCard-style visual pattern
+    - Large icon (48px) with colored background container
+    - Goal name prominently displayed with description
+    - Characteristics chips for each goal (e.g., Lead Generation: "Capture", "Convert", "Engage")
+    - Goal visual mapping with appropriate icons and colors for all 6 goals
+  - **Visual Improvements**:
+    - Enhanced card hover effects with smoother transitions (cubic-bezier easing)
+    - Improved shadow depth on hover (translateY(-2px))
+    - Better border color transitions on hover
+    - Increased padding in main container (p-8 on desktop)
+    - Consistent spacing throughout layout
+  - **Files Modified**:
+    - `frontend/src/components/intake/MagicalIntakeView.tsx` - Layout restructure to 2 columns
+    - `frontend/src/components/intake/components/cards/BusinessNameCard.tsx` - Full-width header with logo placeholder
+    - `frontend/src/components/intake/components/cards/IndustryCard.tsx` - ToneCard-style visual display
+    - `frontend/src/components/intake/components/cards/GoalCard.tsx` - ToneCard-style visual display
+    - `frontend/src/app/globals.css` - Enhanced card hover effects
+  - **Previous**: Premium Cards UI Enhancement (2026-01-26)
+* **Version**: 2.2.0
+
+---
+
+* **Date**: 2026-01-26
+* **Author**: Premium Cards UI Enhancement
+* **Change Context**: Transformed MagicalIntakeView cards screen into premium, visually-rich experience
+  - **UI Enhancements**:
+    - **Background & Styling**: Updated to white background with subtle dot texture pattern and gradient overlays
+      - Added `.bg-premium` class with radial gradient dot pattern and subtle color gradients
+      - Updated card backgrounds to pure white with enhanced shadows and hover effects
+      - Premium card styling with improved borders, shadows, and transitions
+    - **FieldCard Component**: Enhanced base card wrapper with icon support and premium styling
+      - Added icon prop support with colored icon containers (8x8 rounded squares)
+      - Enhanced shadows, borders, and hover effects for premium feel
+      - Updated to use white card backgrounds matching new theme
+    - **Color Card**: Transformed to visual grid display
+      - Grid layout with color swatches (48px rounded squares)
+      - Each color shows: swatch, color name, and hex code
+      - Added Brain icon with light blue color (#60A5FA)
+    - **Typography Card**: Enhanced with actual font previews
+      - "Display Font" section: Shows font name in large, styled text using actual display font (italic for serif)
+      - "Body Font" section: Shows font name in smaller text using actual body font
+      - Added Type icon with green color (#22C55E)
+    - **Style Card**: Added visual style preview display
+      - Shows StylePreview thumbnail when not editing
+      - Displays style name and description prominently
+      - Added Palette icon with purple color (#A855F7)
+    - **Tone Card**: Enhanced with visual indicators
+      - Icon-based visual representation for each tone (Briefcase, Smile, Coffee, Award, Sparkles, Zap)
+      - Shows tone characteristics as colored badges
+      - Added MessageCircle icon with purple color (#A855F7)
+    - **All Card Icons**: Added contextual icons to all cards
+      - BusinessNameCard: Building2 icon (indigo #6366F1)
+      - IndustryCard: Briefcase icon (blue #3B82F6)
+      - GoalCard: Target icon (red #EF4444)
+      - PagesCard: FileText icon (green #10B981)
+    - **Layout Optimization**: Improved masonry grid layout
+      - Updated MagicalIntakeView to use premium background with texture
+      - Optimized grid with `grid-auto-flow: dense` for better space utilization
+      - Adjusted column spans to minimize empty spaces (FontsCard spans 2 columns on xl screens)
+      - Header and footer with backdrop blur for premium feel
+  - **Files Modified**:
+    - `frontend/src/app/globals.css` - Background textures, premium card styles
+    - `frontend/src/components/intake/MagicalIntakeView.tsx` - Layout, background, grid optimization
+    - `frontend/src/components/intake/components/FieldCard.tsx` - Icon support, premium styling
+    - `frontend/src/components/intake/components/cards/ColorsCard.tsx` - Grid display format
+    - `frontend/src/components/intake/components/cards/FontsCard.tsx` - Font preview display
+    - `frontend/src/components/intake/components/cards/StyleCard.tsx` - Visual style preview
+    - `frontend/src/components/intake/components/cards/ToneCard.tsx` - Visual tone indicators
+    - `frontend/src/components/intake/components/cards/BusinessNameCard.tsx` - Added icon
+    - `frontend/src/components/intake/components/cards/IndustryCard.tsx` - Added icon
+    - `frontend/src/components/intake/components/cards/GoalCard.tsx` - Added icon
+    - `frontend/src/components/intake/components/cards/PagesCard.tsx` - Added icon
+  - **Previous**: Magical Single-Screen Intake Implementation (2026-01-26)
+* **Version**: 2.1.0

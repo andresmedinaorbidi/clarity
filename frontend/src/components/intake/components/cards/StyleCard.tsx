@@ -10,6 +10,75 @@ import type { WebsiteState } from "@/hooks/use-orchestrator";
 import { updateProject, getProjectState } from "@/lib/api";
 import type { SourceType } from "../SourceBadge";
 import StyleChooser from "../pickers/StyleChooser";
+import { Palette } from "lucide-react";
+
+/**
+ * Style preview thumbnails with visual representations
+ */
+function StylePreview({ style }: { style: string }) {
+  const previews: Record<string, React.ReactNode> = {
+    minimal: (
+      <div className="w-full h-full bg-white rounded p-2 flex flex-col gap-1">
+        <div className="h-1 w-8 bg-gray-800 rounded" />
+        <div className="h-1 w-12 bg-gray-300 rounded" />
+        <div className="flex-1" />
+        <div className="h-2 w-6 bg-gray-800 rounded" />
+      </div>
+    ),
+    modern: (
+      <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 rounded p-2 flex flex-col gap-1">
+        <div className="h-1.5 w-10 bg-white rounded" />
+        <div className="h-1 w-8 bg-white/60 rounded" />
+        <div className="flex-1" />
+        <div className="h-2 w-8 bg-white rounded-full" />
+      </div>
+    ),
+    elegant: (
+      <div className="w-full h-full bg-stone-100 rounded p-2 flex flex-col gap-1">
+        <div className="h-1 w-10 bg-stone-800 rounded" style={{ fontFamily: "serif" }} />
+        <div className="h-0.5 w-6 bg-amber-600 rounded" />
+        <div className="flex-1" />
+        <div className="h-1.5 w-8 bg-stone-800 rounded" />
+      </div>
+    ),
+    playful: (
+      <div className="w-full h-full bg-gradient-to-br from-pink-400 to-yellow-300 rounded p-2 flex flex-col gap-1">
+        <div className="h-2 w-8 bg-white rounded-full" />
+        <div className="flex gap-1">
+          <div className="h-1 w-2 bg-white/80 rounded-full" />
+          <div className="h-1 w-2 bg-white/80 rounded-full" />
+        </div>
+        <div className="flex-1" />
+        <div className="h-2 w-6 bg-white rounded-full" />
+      </div>
+    ),
+    corporate: (
+      <div className="w-full h-full bg-slate-800 rounded p-2 flex flex-col gap-1">
+        <div className="h-1 w-10 bg-blue-400 rounded" />
+        <div className="h-0.5 w-8 bg-slate-400 rounded" />
+        <div className="flex-1 flex gap-0.5 mt-1">
+          <div className="w-3 h-3 bg-slate-600 rounded" />
+          <div className="w-3 h-3 bg-slate-600 rounded" />
+        </div>
+        <div className="h-1.5 w-6 bg-blue-400 rounded" />
+      </div>
+    ),
+    bold: (
+      <div className="w-full h-full bg-black rounded p-2 flex flex-col gap-1">
+        <div className="h-2 w-full bg-red-500 rounded" />
+        <div className="h-1 w-10 bg-white rounded" />
+        <div className="flex-1" />
+        <div className="h-2 w-8 bg-yellow-400 rounded" />
+      </div>
+    ),
+  };
+
+  return (
+    <div className="w-full aspect-[4/3] rounded-lg overflow-hidden border border-gray-200">
+      {previews[style] || previews.minimal}
+    </div>
+  );
+}
 
 interface StyleCardProps {
   state: WebsiteState;
@@ -75,7 +144,22 @@ export default function StyleCard({
     setIsEditing(false);
   };
 
-  const displayValue = STYLE_OPTIONS.find((opt) => opt.value === currentValue)?.label || currentValue || "";
+  const styleValue = typeof currentValue === "string" ? currentValue : "";
+  const styleLabel = STYLE_OPTIONS.find((opt) => opt.value === styleValue)?.label || styleValue || "";
+
+  const displayValue = styleValue ? (
+    <div className="space-y-3">
+      <StylePreview style={styleValue} />
+      <p className="text-base font-semibold text-text-primary">{styleLabel}</p>
+      {STYLE_OPTIONS.find((opt) => opt.value === styleValue)?.description && (
+        <p className="text-sm text-text-muted">
+          {STYLE_OPTIONS.find((opt) => opt.value === styleValue)?.description}
+        </p>
+      )}
+    </div>
+  ) : (
+    <p className="text-text-muted italic text-sm">Select design style</p>
+  );
 
   return (
     <FieldCard
@@ -89,6 +173,8 @@ export default function StyleCard({
       loading={loading}
       required
       emptyPlaceholder="Select design style"
+      icon={Palette}
+      iconColor="#A855F7"
     >
       <StyleChooser
         options={priorityResult?.options || STYLE_OPTIONS}

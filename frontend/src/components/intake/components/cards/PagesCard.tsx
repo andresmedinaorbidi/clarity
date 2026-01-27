@@ -10,6 +10,7 @@ import type { WebsiteState } from "@/hooks/use-orchestrator";
 import { updateProject, getProjectState } from "@/lib/api";
 import type { SourceType } from "../SourceBadge";
 import MultiSelectChips from "../pickers/MultiSelectChips";
+import { FileText } from "lucide-react";
 
 interface PagesCardProps {
   state: WebsiteState;
@@ -90,6 +91,8 @@ export default function PagesCard({
       onCancel={handleCancel}
       loading={loading}
       emptyPlaceholder="Select pages for your website"
+      icon={FileText}
+      iconColor="#10B981"
     >
       <MultiSelectChips
         options={PAGE_OPTIONS}
