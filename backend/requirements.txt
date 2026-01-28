@@ -20,3 +20,8 @@ google-genai>=1.0.0
 # Web Scraping (for Research Agent)
 httpx>=0.27.0
 beautifulsoup4>=4.12.0
+
+# LangChain & LangSmith
+langchain>=0.3.0
+langchain-google-genai>=2.0.0
+langsmith>=0.2.0

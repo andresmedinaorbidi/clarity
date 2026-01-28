@@ -1,27 +1,76 @@
 import os
 import json
 import re
+import inspect
 from google import genai
 from dotenv import load_dotenv
-from typing import Any
+from typing import Any, Optional
 
 load_dotenv()
 
 # Setup the Gemini Client
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-def ask_gemini(prompt: str, json_mode: bool = False) -> str:
-    """Sends a prompt to Gemini and returns the response."""
-    config = None
-    if json_mode:
-        config = {"response_mime_type": "application/json"}
+# LangSmith setup (optional - graceful fallback if not configured)
+try:
+    from langsmith import traceable
+    LANGSMITH_ENABLED = bool(os.getenv("LANGSMITH_API_KEY"))
+    if LANGSMITH_ENABLED:
+        print("[LangSmith] Tracing enabled")
+    else:
+        print("[LangSmith] API key not found - tracing disabled")
+except ImportError:
+    LANGSMITH_ENABLED = False
+    # Create a no-op decorator if LangSmith isn't installed
+    def traceable(**kwargs):
+        def decorator(func):
+            return func
+        return decorator
+    print("[LangSmith] Package not installed - tracing disabled")
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash", 
-        contents=prompt,
-        config=config
-    )
-    return response.text
+def _get_caller_agent_name() -> Optional[str]:
+    """Try to extract agent name from call stack for better tracing."""
+    try:
+        stack = inspect.stack()
+        # Look for agent files in the call stack
+        for frame in stack[2:6]:  # Skip current and immediate caller
+            filename = frame.filename
+            if 'agents' in filename:
+                # Extract agent name from filename (e.g., "intake_agent.py" -> "intake_agent")
+                agent_name = os.path.basename(filename).replace('.py', '')
+                return agent_name
+    except:
+        pass
+    return None
+
+def ask_gemini(prompt: str, json_mode: bool = False, agent_name: Optional[str] = None) -> str:
+    """Sends a prompt to Gemini and returns the response.
+    
+    Args:
+        prompt: The prompt to send
+        json_mode: Whether to request JSON response
+        agent_name: Optional agent name for LangSmith tracing (auto-detected if not provided)
+    """
+    # Auto-detect agent name if not provided
+    if agent_name is None and LANGSMITH_ENABLED:
+        agent_name = _get_caller_agent_name()
+    
+    trace_name = agent_name or "ask_gemini"
+    
+    @traceable(name=trace_name, run_type="llm")
+    def _call_gemini(prompt: str, json_mode: bool):
+        config = None
+        if json_mode:
+            config = {"response_mime_type": "application/json"}
+
+        response = client.models.generate_content(
+            model="gemini-2.5-flash", 
+            contents=prompt,
+            config=config
+        )
+        return response.text
+    
+    return _call_gemini(prompt, json_mode)
 
 def load_prompt(agent_name: str) -> str:
     file_path = f"prompts/{agent_name}.txt"
@@ -97,15 +146,21 @@ def log_agent_action(agent_name: str, input_prompt: str, output: Any):
 def stream_gemini(
     prompt: str,
     json_mode: bool = False,
-    model_type: str = "default"  # default | flash | pro
+    model_type: str = "default",  # default | flash | pro
+    agent_name: Optional[str] = None
 ):
     """
     Model selection:
     - default -> gemini-2.5-flash (general creation)
     - flash    -> gemini-2.0-flash (super fast chat)
     - pro     -> gemini-2.5-pro   (code generation)
+    
+    Args:
+        prompt: The prompt to send
+        json_mode: Whether to request JSON response
+        model_type: Model variant to use
+        agent_name: Optional agent name for LangSmith tracing (auto-detected if not provided)
     """
-
     MODEL_MAP = {
         "default": "gemini-2.5-flash",
         "flash": "gemini-2.0-flash",
@@ -115,17 +170,37 @@ def stream_gemini(
     model_id = MODEL_MAP.get(model_type, MODEL_MAP["default"])
     config = {"response_mime_type": "application/json"} if json_mode else None
 
+    # Auto-detect agent name if not provided
+    if agent_name is None and LANGSMITH_ENABLED:
+        agent_name = _get_caller_agent_name()
+    
+    trace_name = f"{agent_name or 'stream_gemini'}_{model_type}"
+
+    @traceable(name=trace_name, run_type="llm")
+    def _stream_gemini_internal(prompt: str, model_id: str, config: dict):
+        try:
+            response = client.models.generate_content_stream(
+                model=model_id,
+                contents=prompt,
+                config=config
+            )
+
+            full_response = ""
+            for chunk in response:
+                if chunk.text:
+                    full_response += chunk.text
+                    yield chunk.text
+            
+            # Return full response for LangSmith tracing
+            return full_response
+
+        except Exception as e:
+            error_msg = f" [Error: {str(e)}] "
+            yield error_msg
+            raise
+
     try:
-        response = client.models.generate_content_stream(
-            model=model_id,
-            contents=prompt,
-            config=config
-        )
-
-        for chunk in response:
-            if chunk.text:
-                yield chunk.text
-
+        yield from _stream_gemini_internal(prompt, model_id, config)
     except Exception as e:
         yield f" [Error: {str(e)}] "
 
